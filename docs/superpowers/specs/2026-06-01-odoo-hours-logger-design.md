@@ -42,7 +42,7 @@ Odoo with a click — nothing is written automatically.
 | Calendar access | **Private iCal URL** (no Google OAuth) |
 | Stack | **Python FastAPI backend** + **clean React frontend** (Vite + TS), UI designed with the ui-ux-pro-max skill |
 | Odoo transport | **XML-RPC** (`xmlrpc.client`), universal across Odoo versions; API-key auth |
-| Local storage | **SQLite** for rules + dedup ledger |
+| Local storage | **Plain JSON files** for rules + dedup ledger — **no database** |
 
 ## 4. Architecture
 
@@ -55,7 +55,7 @@ Odoo with a click — nothing is written automatically.
 │ Odoo (Project + │ ◀──────────────────▶  │  - odoo_client   │
 │  Task / a.a.l.) │                        │  - matcher       │
 └─────────────────┘                       │  - rules + ledger│
-                                          │    (SQLite)      │
+                                          │   (JSON files)   │
                                           └────────┬─────────┘
                                                    │ REST/JSON
                                           ┌────────▼─────────┐
@@ -81,25 +81,29 @@ FastAPI API.
 - **`matcher`** — applies keyword rules (case-insensitive substring match on the
   event title, ordered by priority) to propose a Project/Task. Returns the
   chosen rule plus any other candidate matches; flags unmatched events.
-- **`rules`** — CRUD store (SQLite) for keyword→project/task rules, backing the
-  in-app editor.
-- **`ledger`** — SQLite record of `event UID → Odoo line id` for everything
-  pushed. The dedup mechanism so re-loading a range never double-logs.
+- **`rules`** — CRUD store backed by a single JSON file (`rules.json`) for
+  keyword→project/task rules, backing the in-app editor. Loaded on read,
+  rewritten on each add/edit/delete (single user, no concurrent writes).
+- **`ledger`** — JSON file (`ledger.json`) recording `event UID → Odoo line id`
+  for everything pushed. The dedup mechanism so re-loading a range never
+  double-logs.
 - **`aggregations`** — daily rollup (events grouped by day) and weekly
   per-contract rollup (totals per Project/Task for a week).
 - **`schemas`** — Pydantic models for API request/response payloads.
 
-## 6. Data model (SQLite)
+## 6. Data model (JSON files)
 
-**`rules`**
-- `id` (pk), `name`, `keywords` (list; matched as case-insensitive substrings),
+Both files live in a git-ignored local data dir (`backend/data/`).
+
+**`rules.json`** — a JSON array of rule objects:
+- `id`, `name`, `keywords` (array; matched as case-insensitive substrings),
   `project_id`, `project_name`, `task_id`, `task_name`, `priority` (int, lower =
   evaluated first), `active` (bool).
 
-**`ledger`**
-- `id` (pk), `event_uid`, `event_start`, `odoo_line_id`, `project_id`,
-  `task_id`, `hours`, `pushed_at`. Unique on (`event_uid`, `event_start`) so a
-  recurring instance is tracked per-occurrence.
+**`ledger.json`** — a JSON array of pushed-entry records:
+- `event_uid`, `event_start`, `odoo_line_id`, `project_id`, `task_id`, `hours`,
+  `pushed_at`. Dedup is keyed on (`event_uid`, `event_start`) so a recurring
+  instance is tracked per-occurrence.
 
 ## 7. Data flow (core loop)
 
@@ -183,8 +187,9 @@ ODOO_API_KEY=
 LOCAL_TZ=Europe/Lisbon
 ```
 
-Rules and the dedup ledger live in a local SQLite file. No secrets are committed
-to the repo (`.env` and the SQLite db are git-ignored).
+Rules and the dedup ledger live as JSON files in a local `backend/data/` dir.
+No secrets or local state are committed to the repo (`.env` and `backend/data/`
+are git-ignored).
 
 ## 14. Error handling
 
@@ -213,10 +218,11 @@ odoo-hours-logger/
       calendar_source.py # fetch + parse iCal, expand recurrences, compute hours
       odoo_client.py     # XML-RPC wrapper
       matcher.py         # keyword → project/task matching
-      rules.py           # CRUD for mapping rules (SQLite)
-      ledger.py          # dedup ledger (SQLite)
+      rules.py           # CRUD for mapping rules (rules.json)
+      ledger.py          # dedup ledger (ledger.json)
       aggregations.py    # daily + weekly-per-contract rollups
       schemas.py         # Pydantic models
+    data/                # rules.json + ledger.json (git-ignored)
     tests/
     pyproject.toml
     .env.example

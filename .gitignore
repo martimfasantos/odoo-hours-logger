@@ -1,8 +1,6 @@
 # Secrets & local state
 .env
-*.sqlite
-*.sqlite3
-*.db
+backend/data/
 
 # Python
 __pycache__/
