@@ -73,15 +73,17 @@ export default function DailyView() {
       setProposals(data);
       setHasFetched(true);
       const init: Record<string, RowState> = {};
+      const projectIds = new Set<number>();
       for (const p of data) {
         init[rowKey(p)] = {
           projectId: p.match.project_id,
           taskId: p.match.task_id,
           approved: false,
         };
-        if (p.match.project_id) loadTasks(p.match.project_id);
+        if (p.match.project_id) projectIds.add(p.match.project_id);
       }
       setRows(init);
+      for (const id of projectIds) loadTasks(id);
     } catch (e) {
       toast.error(`Failed to fetch calendar: ${String(e)}`);
     } finally {
@@ -300,7 +302,7 @@ export default function DailyView() {
                             {formatTime(p.event.start)}
                           </td>
                           <td className="cell-title">{p.event.title}</td>
-                          <td className="num">{p.event.hours.toFixed(2)}</td>
+                          <td className="num">{formatHours(p.event.hours)}</td>
                           <td>
                             <select
                               className="select select--cell"

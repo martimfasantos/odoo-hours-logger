@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { BarChart3, CalendarX2 } from "lucide-react";
 import { api } from "../api/client";
 import type { ContractTotal } from "../api/types";
@@ -16,20 +16,25 @@ export default function WeeklyByContract() {
   const [totals, setTotals] = useState<ContractTotal[]>([]);
   const [loading, setLoading] = useState(false);
 
+  const reqId = useRef(0);
+
   useEffect(() => {
     load(start, end);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function load(s: string, e: string) {
+    const myId = ++reqId.current;
     setLoading(true);
     try {
       const data = await api.weekly(s, e);
+      if (myId !== reqId.current) return;
       setTotals(data);
     } catch (err) {
+      if (myId !== reqId.current) return;
       toast.error(`Failed to load weekly totals: ${String(err)}`);
     } finally {
-      setLoading(false);
+      if (myId === reqId.current) setLoading(false);
     }
   }
 
@@ -184,14 +189,14 @@ export default function WeeklyByContract() {
                     <tr key={`${row.project_id}-${row.task_id ?? "none"}-${i}`}>
                       <td>{row.project_name}</td>
                       <td className="muted">{row.task_name ?? "—"}</td>
-                      <td className="num">{row.hours.toFixed(2)}</td>
+                      <td className="num">{formatHours(row.hours)}</td>
                     </tr>
                   ))}
                 </tbody>
                 <tfoot>
                   <tr>
                     <td colSpan={2}>Total</td>
-                    <td className="num">{grandTotal.toFixed(2)}</td>
+                    <td className="num">{formatHours(grandTotal)}</td>
                   </tr>
                 </tfoot>
               </table>

@@ -295,6 +295,9 @@ a {
   min-height: 38px;
   transition: border-color var(--transition), box-shadow var(--transition);
 }
+.select {
+  cursor: pointer;
+}
 .input:hover,
 .select:hover {
   border-color: var(--color-secondary);
@@ -308,9 +311,6 @@ a {
 .input[type="date"] {
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
-}
-.input--mono {
-  font-family: var(--font-mono);
 }
 .select--cell {
   min-height: 32px;
@@ -404,9 +404,6 @@ a {
   padding: 0 var(--space-3);
   font-size: 0.82rem;
 }
-.btn--icon {
-  padding: 0 var(--space-2);
-}
 
 /* ============================================================
    Badges
@@ -438,7 +435,7 @@ a {
 }
 .badge--warning {
   background: #FEF3E2;
-  color: var(--color-accent);
+  color: #92400E;
   border-color: #FCD9A6;
 }
 .badge--active {
