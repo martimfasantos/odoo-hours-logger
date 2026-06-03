@@ -43,13 +43,13 @@ class OdooClient:
     def list_projects(self) -> list[OdooRef]:
         rows = self._exec("project.project", "search_read", [],
                           fields=["id", "name"], order="name")
-        return [OdooRef(**row) for row in rows]
+        return [OdooRef(id=row["id"], name=row.get("name") or "") for row in rows]
 
     def list_tasks(self, project_id: int) -> list[OdooRef]:
         rows = self._exec("project.task", "search_read",
                           [["project_id", "=", project_id]],
                           fields=["id", "name"], order="name")
-        return [OdooRef(**row) for row in rows]
+        return [OdooRef(id=row["id"], name=row.get("name") or "") for row in rows]
 
     def employee_id(self) -> int:
         if self._employee_id is None:

@@ -71,6 +71,15 @@ def test_test_connection_true():
     assert c.test_connection() is True
 
 
+def test_list_projects_coerces_falsy_name():
+    c = _client()
+    c.models.execute_kw.return_value = [{"id": 10, "name": False}]
+    projects = c.list_projects()
+    assert len(projects) == 1
+    assert projects[0].id == 10
+    assert projects[0].name == ""
+
+
 def test_create_timesheet_omits_task_id_when_none():
     c = _client()
     c.models.execute_kw.side_effect = [
