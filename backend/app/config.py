@@ -1,5 +1,7 @@
 from pathlib import Path
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -15,10 +17,17 @@ class Settings(BaseSettings):
     USER_EMAIL: str = ""
     DATA_DIR: str = "data"
 
+    @field_validator("LOCAL_TZ")
+    @classmethod
+    def _validate_tz(cls, v: str) -> str:
+        try:
+            ZoneInfo(v)
+        except (ZoneInfoNotFoundError, ValueError) as exc:
+            raise ValueError(f"Invalid LOCAL_TZ timezone: {v!r}") from exc
+        return v
+
     def data_path(self, filename: str) -> Path:
-        d = Path(self.DATA_DIR)
-        d.mkdir(parents=True, exist_ok=True)
-        return d / filename
+        return Path(self.DATA_DIR) / filename
 
 
 def get_settings() -> Settings:
