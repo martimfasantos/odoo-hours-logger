@@ -49,3 +49,22 @@ def test_recurring_event_expanded_into_instances():
     assert len(instances) == 3
     starts = sorted(e.start.date() for e in instances)
     assert starts[0] == date(2026, 6, 1)
+
+
+def test_duration_event_parsed_and_hours():
+    events = parse_events(FIXTURE, date(2026, 6, 1), date(2026, 6, 1),
+                          local_tz="Europe/Lisbon", user_email="me@example.com")
+    by = _by_uid(events)
+    assert "evt-duration-1" in by
+    ev = by["evt-duration-1"][0]
+    assert ev.hours == 0.75
+
+
+def test_naive_event_is_timezone_aware_and_hours():
+    events = parse_events(FIXTURE, date(2026, 6, 1), date(2026, 6, 1),
+                          local_tz="Europe/Lisbon", user_email="me@example.com")
+    by = _by_uid(events)
+    assert "evt-naive-1" in by
+    ev = by["evt-naive-1"][0]
+    assert ev.start.tzinfo is not None
+    assert ev.hours == 0.5

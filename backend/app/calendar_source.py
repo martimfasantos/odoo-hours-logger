@@ -1,5 +1,5 @@
 from datetime import date as Date
-from datetime import datetime, time, timedelta
+from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
 import httpx
@@ -49,22 +49,29 @@ def parse_events(
     events: list[CalendarEvent] = []
     for comp in components:
         dtstart = comp.get("DTSTART").dt
-        dtend_field = comp.get("DTEND")
         # All-day events have a `date` (not datetime) DTSTART -> skip
         if not isinstance(dtstart, datetime):
             continue
-        if dtend_field is None:
+        dtend_field = comp.get("DTEND")
+        duration_field = comp.get("DURATION")
+        if dtend_field is not None:
+            dtend = dtend_field.dt
+        elif duration_field is not None:
+            dtend = dtstart + duration_field.dt
+        else:
             continue
-        dtend = dtend_field.dt
         if not isinstance(dtend, datetime):
             continue
         if _is_declined(comp, user_email):
             continue
 
-        # Normalize to local tz (naive datetimes are assumed already local)
+        # Normalize to local tz; naive datetimes get the local tz attached
         if dtstart.tzinfo is not None:
             dtstart = dtstart.astimezone(tz)
             dtend = dtend.astimezone(tz)
+        else:
+            dtstart = dtstart.replace(tzinfo=tz)
+            dtend = dtend.replace(tzinfo=tz)
 
         hours = round((dtend - dtstart).total_seconds() / 3600.0, 2)
         if hours <= 0:
