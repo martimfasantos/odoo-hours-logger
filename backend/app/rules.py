@@ -11,7 +11,10 @@ class RulesStore:
     def _load_raw(self) -> list[dict]:
         if not self.path.exists():
             return []
-        return json.loads(self.path.read_text() or "[]")
+        try:
+            return json.loads(self.path.read_text())
+        except (json.JSONDecodeError, ValueError):
+            return []
 
     def _save_raw(self, items: list[dict]) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)

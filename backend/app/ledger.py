@@ -15,7 +15,10 @@ class Ledger:
     def _load(self) -> list[dict]:
         if not self.path.exists():
             return []
-        return json.loads(self.path.read_text() or "[]")
+        try:
+            return json.loads(self.path.read_text())
+        except (json.JSONDecodeError, ValueError):
+            return []
 
     def _save(self, items: list[dict]) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)

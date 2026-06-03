@@ -1,5 +1,6 @@
 from collections import defaultdict
 from datetime import date as Date
+from typing import Optional
 
 from app.schemas import CalendarEvent, ContractTotal, ProposedEntry
 
@@ -12,7 +13,7 @@ def group_by_day(events: list[CalendarEvent]) -> dict[Date, list[CalendarEvent]]
 
 
 def weekly_by_contract(entries: list[ProposedEntry]) -> list[ContractTotal]:
-    buckets: dict[tuple, ContractTotal] = {}
+    buckets: dict[tuple[int, Optional[int]], ContractTotal] = {}
     for entry in entries:
         m = entry.match
         if m.project_id is None:

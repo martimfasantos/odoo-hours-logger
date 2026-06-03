@@ -31,3 +31,9 @@ def test_persists_across_instances(tmp_path):
     _ledger(tmp_path).record("uid-1", datetime(2026, 6, 1, 9, 0), odoo_line_id=1,
                              project_id=10, task_id=None, hours=1.0, pushed_at="x")
     assert _ledger(tmp_path).is_logged("uid-1", datetime(2026, 6, 1, 9, 0)) is True
+
+
+def test_corrupt_file_not_logged(tmp_path):
+    path = tmp_path / "ledger.json"
+    path.write_text("   ")
+    assert Ledger(path).is_logged("uid-1", datetime(2026, 6, 1, 9, 0)) is False

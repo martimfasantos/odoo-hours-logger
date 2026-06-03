@@ -49,3 +49,9 @@ def test_delete_removes_rule(tmp_path):
     r = s.create(_payload())
     s.delete(r.id)
     assert s.list() == []
+
+
+def test_corrupt_file_returns_empty(tmp_path):
+    path = tmp_path / "rules.json"
+    path.write_text("{not json")
+    assert RulesStore(path).list() == []
