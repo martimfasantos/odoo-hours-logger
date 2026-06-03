@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from app import deps
-from app.aggregations import group_by_day, weekly_by_contract
+from app.aggregations import weekly_by_contract
 from app.calendar_source import fetch_ical, parse_events
 from app.config import Settings
 from app.ledger import Ledger
@@ -55,8 +55,13 @@ def _build_proposals(events: list[CalendarEvent], rules: list[Rule],
 
 
 def _load_events(start: Date, end: Date, settings: Settings) -> list[CalendarEvent]:
-    ics = fetch_ical(settings.ICAL_URL)
-    return parse_events(ics, start, end, settings.LOCAL_TZ, settings.USER_EMAIL)
+    try:
+        ics = fetch_ical(settings.ICAL_URL)
+        return parse_events(ics, start, end, settings.LOCAL_TZ, settings.USER_EMAIL)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Failed to load calendar: {exc}")
 
 
 @app.get("/api/health")

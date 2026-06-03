@@ -1,15 +1,17 @@
-from datetime import datetime
+from datetime import date as Date
+from datetime import datetime, timezone
 from unittest.mock import MagicMock
 
 import pytest
 from fastapi.testclient import TestClient
 
 from app import deps
+from app.config import Settings
 from app.main import app
 from app.ledger import Ledger
 from app.odoo_client import OdooClient
 from app.rules import RulesStore
-from app.schemas import OdooRef
+from app.schemas import CalendarEvent, OdooRef
 
 
 @pytest.fixture
@@ -23,9 +25,19 @@ def client(tmp_path, monkeypatch):
     fake_odoo.create_timesheet.return_value = 500
     fake_odoo.test_connection.return_value = True
 
+    fake_settings = Settings(
+        ICAL_URL="https://example.com/calendar.ics",
+        ODOO_URL="https://odoo.example.com",
+        ODOO_DB="testdb",
+        ODOO_USERNAME="user@example.com",
+        ODOO_API_KEY="testkey",
+        DATA_DIR=str(tmp_path),
+    )
+
     app.dependency_overrides[deps.rules_store] = lambda: rs
     app.dependency_overrides[deps.ledger] = lambda: lg
     app.dependency_overrides[deps.odoo] = lambda: fake_odoo
+    app.dependency_overrides[deps.settings] = lambda: fake_settings
 
     yield TestClient(app), fake_odoo, lg
     app.dependency_overrides.clear()
@@ -86,3 +98,58 @@ def test_push_skips_already_logged(client):
     assert resp.json()["results"][0]["success"] is False
     assert "already logged" in resp.json()["results"][0]["error"].lower()
     fake_odoo.create_timesheet.assert_not_called()
+
+
+def test_calendar_events_returns_502_when_ical_fails(client, monkeypatch):
+    c, _, _ = client
+
+    def _fail(url, **kw):
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr("app.main.fetch_ical", _fail)
+    resp = c.get("/api/calendar/events?start=2026-06-01&end=2026-06-07")
+    assert resp.status_code == 502
+    assert "Failed to load calendar" in resp.json()["detail"]
+
+
+def test_daily_groups_events_by_date(client, monkeypatch):
+    c, _, _ = client
+
+    day1 = Date(2026, 6, 1)
+    day2 = Date(2026, 6, 2)
+    tz = timezone.utc
+
+    fake_events = [
+        CalendarEvent(
+            uid="evt-a",
+            title="Meeting A",
+            start=datetime(2026, 6, 1, 9, 0, tzinfo=tz),
+            end=datetime(2026, 6, 1, 10, 0, tzinfo=tz),
+            hours=1.0,
+            date=day1,
+        ),
+        CalendarEvent(
+            uid="evt-b",
+            title="Meeting B",
+            start=datetime(2026, 6, 1, 11, 0, tzinfo=tz),
+            end=datetime(2026, 6, 1, 12, 0, tzinfo=tz),
+            hours=1.0,
+            date=day1,
+        ),
+        CalendarEvent(
+            uid="evt-c",
+            title="Meeting C",
+            start=datetime(2026, 6, 2, 9, 0, tzinfo=tz),
+            end=datetime(2026, 6, 2, 10, 0, tzinfo=tz),
+            hours=1.0,
+            date=day2,
+        ),
+    ]
+
+    monkeypatch.setattr("app.main._load_events", lambda start, end, settings: fake_events)
+    resp = c.get("/api/timesheet/daily?start=2026-06-01&end=2026-06-02")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert "2026-06-01" in body
+    assert "2026-06-02" in body
+    assert len(body["2026-06-01"]) == 2
