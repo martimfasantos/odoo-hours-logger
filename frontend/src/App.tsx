@@ -1,122 +1,98 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import heroImg from './assets/hero.png'
-import './App.css'
+import { useEffect, useState } from "react";
+import { NavLink, Route, Routes } from "react-router-dom";
+import {
+  CalendarClock,
+  BarChart3,
+  Tags,
+  Settings as SettingsIcon,
+  Clock,
+} from "lucide-react";
+import { api } from "./api/client";
+import DailyView from "./pages/DailyView";
+import WeeklyByContract from "./pages/WeeklyByContract";
+import MappingRules from "./pages/MappingRules";
+import Settings from "./pages/Settings";
 
-function App() {
-  const [count, setCount] = useState(0)
+type Health = "checking" | "ok" | "down";
+
+const NAV = [
+  { to: "/", label: "Daily hours", icon: CalendarClock, end: true },
+  { to: "/weekly", label: "Weekly by contract", icon: BarChart3, end: false },
+  { to: "/rules", label: "Mapping rules", icon: Tags, end: false },
+  { to: "/settings", label: "Settings", icon: SettingsIcon, end: false },
+];
+
+export default function App() {
+  const [health, setHealth] = useState<Health>("checking");
+
+  useEffect(() => {
+    let alive = true;
+    api
+      .health()
+      .then(() => alive && setHealth("ok"))
+      .catch(() => alive && setHealth("down"));
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const statusLabel =
+    health === "ok"
+      ? "Backend connected"
+      : health === "down"
+        ? "Backend unreachable"
+        : "Checking backend…";
 
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
+    <div className="app">
+      <aside className="sidebar">
+        <div className="sidebar__brand">
+          <span className="sidebar__brand-mark" aria-hidden="true">
+            <Clock size={18} />
+          </span>
+          <span className="sidebar__title">Odoo Hours Logger</span>
         </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.tsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
 
-      <div className="ticks"></div>
+        <nav className="sidebar__nav" aria-label="Primary">
+          {NAV.map(({ to, label, icon: Icon, end }) => (
+            <NavLink
+              key={to}
+              to={to}
+              end={end}
+              className={({ isActive }) =>
+                isActive ? "navlink active" : "navlink"
+              }
+            >
+              <Icon size={18} aria-hidden="true" />
+              {label}
+            </NavLink>
+          ))}
+        </nav>
 
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
+        <div className="sidebar__status">
+          <span
+            className={
+              health === "ok"
+                ? "status-dot status-dot--ok"
+                : health === "down"
+                  ? "status-dot status-dot--down"
+                  : "status-dot"
+            }
+            role="img"
+            aria-label={statusLabel}
+          />
+          <span>{statusLabel}</span>
         </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
+      </aside>
 
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
-  )
+      <main className="main">
+        <Routes>
+          <Route path="/" element={<DailyView />} />
+          <Route path="/weekly" element={<WeeklyByContract />} />
+          <Route path="/rules" element={<MappingRules />} />
+          <Route path="/settings" element={<Settings />} />
+        </Routes>
+      </main>
+    </div>
+  );
 }
-
-export default App
