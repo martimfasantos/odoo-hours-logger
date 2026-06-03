@@ -56,3 +56,29 @@ def test_create_timesheet_returns_line_id():
     assert vals["unit_amount"] == 0.5
     assert vals["project_id"] == 10
     assert vals["employee_id"] == 99
+
+
+def test_employee_id_is_cached():
+    c = _client()
+    c.models.execute_kw.return_value = [{"id": 99}]
+    assert c.employee_id() == 99
+    assert c.employee_id() == 99
+    c.models.execute_kw.assert_called_once()
+
+
+def test_test_connection_true():
+    c = _client()
+    assert c.test_connection() is True
+
+
+def test_create_timesheet_omits_task_id_when_none():
+    c = _client()
+    c.models.execute_kw.side_effect = [
+        [{"id": 99}],  # employee lookup
+        500,            # create
+    ]
+    c.create_timesheet(date="2026-06-01", name="x", hours=1.0,
+                       project_id=10, task_id=None)
+    vals = c.models.execute_kw.call_args_list[-1][0][5][0]
+    assert "task_id" not in vals
+    assert vals["project_id"] == 10

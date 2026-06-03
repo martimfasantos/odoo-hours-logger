@@ -70,7 +70,7 @@ class OdooClient:
             "project_id": project_id,
             "employee_id": self.employee_id(),
         }
-        if task_id:
+        if task_id is not None:
             vals["task_id"] = task_id
         return self._exec("account.analytic.line", "create", vals)
 
