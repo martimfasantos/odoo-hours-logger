@@ -8,12 +8,12 @@ type ConnectionStatus = "idle" | "loading" | "done";
 
 interface TestResult {
   odoo: boolean;
-  ical: boolean;
+  calendar: boolean;
   errors: Record<string, string>;
 }
 
 const ENV_VARS = [
-  "ICAL_URL",
+  "GOOGLE_CALENDAR_URL",
   "ODOO_URL",
   "ODOO_DB",
   "ODOO_USERNAME",
@@ -33,7 +33,7 @@ export default function Settings() {
       const data = await api.testConnection();
       setResult(data);
       setStatus("done");
-      if (data.odoo && data.ical) {
+      if (data.odoo && data.calendar) {
         toast.success("All connections OK.");
       } else {
         toast.error("One or more connections failed.");
@@ -41,7 +41,7 @@ export default function Settings() {
     } catch (err) {
       toast.error(`Connection test failed: ${String(err)}`);
       setStatus("done");
-      setResult({ odoo: false, ical: false, errors: { odoo: String(err), ical: String(err) } });
+      setResult({ odoo: false, calendar: false, errors: { odoo: String(err), calendar: String(err) } });
     }
   }
 
@@ -104,10 +104,10 @@ export default function Settings() {
                 )}
               </div>
 
-              {/* iCal row */}
+              {/* Google Calendar row */}
               <div className="conn-row">
-                <span className="conn-row__name">iCal</span>
-                {result.ical ? (
+                <span className="conn-row__name">Google Calendar</span>
+                {result.calendar ? (
                   <span className="conn-row__status conn-row__status--ok">
                     <Check size={16} aria-hidden="true" />
                     Connected
@@ -118,8 +118,8 @@ export default function Settings() {
                     Unreachable
                   </span>
                 )}
-                {result.errors.ical && (
-                  <p className="conn-error">{result.errors.ical}</p>
+                {result.errors.calendar && (
+                  <p className="conn-error">{result.errors.calendar}</p>
                 )}
               </div>
             </div>

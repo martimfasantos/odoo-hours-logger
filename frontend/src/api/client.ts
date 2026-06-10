@@ -35,7 +35,12 @@ export const api = {
     req<{ results: PushResult[] }>("/api/timesheet/push", {
       method: "POST", body: JSON.stringify({ entries }),
     }),
+  getColors: () => req<Record<string, string>>("/api/colors"),
+  setColor: (projectId: number, color: string) =>
+    req<Record<string, string>>(`/api/colors/${projectId}`, {
+      method: "PUT", body: JSON.stringify({ color }),
+    }),
   testConnection: () =>
-    req<{ odoo: boolean; ical: boolean; errors: Record<string, string> }>(
+    req<{ odoo: boolean; calendar: boolean; errors: Record<string, string> }>(
       "/api/settings/test-connection", { method: "POST" }),
 };

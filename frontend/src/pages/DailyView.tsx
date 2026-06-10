@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import { RefreshCw, UploadCloud, AlertTriangle, Check, X, CalendarX2 } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { RefreshCw, UploadCloud, AlertTriangle, Check, X, CalendarX2, List, CalendarDays } from "lucide-react";
 import { api } from "../api/client";
 import type {
   OdooRef,
@@ -11,6 +11,7 @@ import { useToast } from "../components/Toast";
 import Button from "../components/Button";
 import Badge from "../components/Badge";
 import Spinner from "../components/Spinner";
+import DailyCalendar from "./DailyCalendar";
 import {
   startOfWeek,
   addDays,
@@ -23,9 +24,47 @@ interface RowState {
   projectId: number | null;
   taskId: number | null;
   approved: boolean;
+  description: string;
 }
 
 const rowKey = (p: ProposedEntry) => `${p.event.uid}|${p.event.start}`;
+
+/** Checkbox that supports the indeterminate visual state via a callback ref. */
+function IndeterminateCheckbox({
+  checked,
+  indeterminate,
+  disabled,
+  onChange,
+  className,
+  "aria-label": ariaLabel,
+}: {
+  checked: boolean;
+  indeterminate: boolean;
+  disabled?: boolean;
+  onChange: (checked: boolean) => void;
+  className?: string;
+  "aria-label": string;
+}) {
+  const ref = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (ref.current) {
+      ref.current.indeterminate = indeterminate;
+    }
+  }, [indeterminate]);
+
+  return (
+    <input
+      ref={ref}
+      type="checkbox"
+      className={className}
+      aria-label={ariaLabel}
+      checked={checked}
+      disabled={disabled}
+      onChange={(e) => onChange(e.target.checked)}
+    />
+  );
+}
 
 export default function DailyView() {
   const toast = useToast();
@@ -41,7 +80,9 @@ export default function DailyView() {
   >({});
   const [rows, setRows] = useState<Record<string, RowState>>({});
   const [results, setResults] = useState<Record<string, PushResult>>({});
+  const [colors, setColors] = useState<Record<string, string>>({});
 
+  const [view, setView] = useState<"list" | "calendar">("list");
   const [loading, setLoading] = useState(false);
   const [pushing, setPushing] = useState(false);
   const [hasFetched, setHasFetched] = useState(false);
@@ -54,6 +95,34 @@ export default function DailyView() {
       .catch((e) => toast.error(`Failed to load projects: ${String(e)}`));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Load stored project colors once (tolerate failure).
+  useEffect(() => {
+    api
+      .getColors()
+      .then(setColors)
+      .catch(() => setColors({}));
+  }, []);
+
+  // Optimistically recolor a project, persisting via the API.
+  async function handleSetColor(projectId: number, hex: string) {
+    const key = String(projectId);
+    const prev = colors[key];
+    setColors((c) => ({ ...c, [key]: hex }));
+    try {
+      const updated = await api.setColor(projectId, hex);
+      setColors(updated);
+    } catch (e) {
+      // Revert on failure.
+      setColors((c) => {
+        const next = { ...c };
+        if (prev === undefined) delete next[key];
+        else next[key] = prev;
+        return next;
+      });
+      toast.error(`Failed to save color: ${String(e)}`);
+    }
+  }
 
   async function loadTasks(projectId: number) {
     if (tasksByProject[projectId]) return;
@@ -79,6 +148,7 @@ export default function DailyView() {
           projectId: p.match.project_id,
           taskId: p.match.task_id,
           approved: false,
+          description: p.event.title,
         };
         if (p.match.project_id) projectIds.add(p.match.project_id);
       }
@@ -110,12 +180,13 @@ export default function DailyView() {
         })
         .map((p) => {
           const r = rows[rowKey(p)]!;
+          const desc = r.description.trim();
           return {
             uid: p.event.uid,
             start: p.event.start,
             date: p.event.date,
             hours: p.event.hours,
-            description: p.event.title,
+            description: desc || p.event.title,
             project_id: r.projectId!,
             task_id: r.taskId,
           };
@@ -179,6 +250,30 @@ export default function DailyView() {
             entries.
           </p>
         </div>
+        <div
+          className="view-toggle"
+          role="group"
+          aria-label="Switch between list and calendar views"
+        >
+          <button
+            type="button"
+            className={`view-toggle__btn${view === "list" ? " is-active" : ""}`}
+            aria-pressed={view === "list"}
+            onClick={() => setView("list")}
+          >
+            <List size={16} aria-hidden="true" />
+            List
+          </button>
+          <button
+            type="button"
+            className={`view-toggle__btn${view === "calendar" ? " is-active" : ""}`}
+            aria-pressed={view === "calendar"}
+            onClick={() => setView("calendar")}
+          >
+            <CalendarDays size={16} aria-hidden="true" />
+            Calendar
+          </button>
+        </div>
       </header>
 
       <div className="card">
@@ -232,7 +327,7 @@ export default function DailyView() {
         </div>
       )}
 
-      {!loading && hasFetched && proposals.length === 0 && (
+      {!loading && hasFetched && proposals.length === 0 && view === "list" && (
         <div className="card">
           <div className="empty">
             <CalendarX2 size={40} aria-hidden="true" />
@@ -241,7 +336,7 @@ export default function DailyView() {
         </div>
       )}
 
-      {!loading && !hasFetched && (
+      {!loading && !hasFetched && view === "list" && (
         <div className="card">
           <div className="empty">
             <CalendarX2 size={40} aria-hidden="true" />
@@ -250,21 +345,68 @@ export default function DailyView() {
         </div>
       )}
 
+      {!loading && view === "calendar" && (
+        <DailyCalendar
+          proposals={proposals}
+          rows={rows}
+          projects={projects}
+          weekStartISO={startOfWeek(new Date(`${start}T00:00:00`))}
+          colors={colors}
+          onSetColor={handleSetColor}
+        />
+      )}
+
       {!loading &&
+        view === "list" &&
         byDay.map(([date, entries]) => {
           const dayTotal = entries.reduce((s, p) => s + p.event.hours, 0);
+          const dayLabel = formatDayHeading(date);
+
+          // Approvable = not already_logged
+          const approvable = entries.filter((p) => !p.already_logged);
+          const approvedInDay = approvable.filter(
+            (p) => !!rows[rowKey(p)]?.approved,
+          );
+          const allApproved =
+            approvable.length > 0 &&
+            approvedInDay.length === approvable.length;
+          const someApproved =
+            approvedInDay.length > 0 && !allApproved;
+          const hasApprovable = approvable.length > 0;
+
+          function handleApproveAll(checked: boolean) {
+            setRows((prev) => {
+              const next = { ...prev };
+              for (const p of approvable) {
+                const k = rowKey(p);
+                next[k] = { ...next[k], approved: checked };
+              }
+              return next;
+            });
+          }
+
           return (
             <section className="card" key={date} aria-label={date}>
               <div className="day-group__head">
-                <span className="day-group__date">
-                  {formatDayHeading(date)}
-                </span>
+                <span className="day-group__date">{dayLabel}</span>
                 <span className="day-group__meta">
                   {entries.length} event{entries.length === 1 ? "" : "s"}
                 </span>
                 <span className="day-group__total num">
                   {formatHours(dayTotal)}
                 </span>
+                {hasApprovable && (
+                  <label className="day-group__approve-all">
+                    <IndeterminateCheckbox
+                      className="checkbox"
+                      aria-label={`Approve all for ${dayLabel}`}
+                      checked={allApproved}
+                      indeterminate={someApproved}
+                      onChange={handleApproveAll}
+                    />
+                    <span>Approve all</span>
+                  </label>
+                )}
               </div>
               <div className="table-wrap">
                 <table className="table">
@@ -277,6 +419,7 @@ export default function DailyView() {
                       </th>
                       <th style={{ width: 200 }}>Project</th>
                       <th style={{ width: 200 }}>Task</th>
+                      <th>Description</th>
                       <th style={{ width: 150 }}>Status</th>
                       <th style={{ width: 90 }} className="text-right">
                         Approve
@@ -341,6 +484,18 @@ export default function DailyView() {
                               ))}
                             </select>
                           </td>
+                          <td className="cell-description">
+                            <input
+                              type="text"
+                              className="input input--cell"
+                              aria-label={`Description for ${p.event.title}`}
+                              value={r?.description ?? p.event.title}
+                              disabled={p.already_logged}
+                              onChange={(e) =>
+                                setRow(key, { description: e.target.value })
+                              }
+                            />
+                          </td>
                           <td>
                             <div
                               style={{
@@ -402,7 +557,7 @@ export default function DailyView() {
           );
         })}
 
-      {!loading && proposals.length > 0 && (
+      {!loading && view === "list" && proposals.length > 0 && (
         <div className="push-bar">
           <span className="push-bar__summary">
             <strong>{approvedCount}</strong> row

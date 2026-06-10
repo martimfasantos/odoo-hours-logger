@@ -5,6 +5,7 @@ import type { ContractTotal } from "../api/types";
 import { useToast } from "../components/Toast";
 import Spinner from "../components/Spinner";
 import { startOfWeek, addDays, formatHours } from "../lib/dates";
+import { colorForProject } from "../lib/colors";
 
 export default function WeeklyByContract() {
   const toast = useToast();
@@ -14,12 +15,17 @@ export default function WeeklyByContract() {
   const [end, setEnd] = useState(addDays(initialStart, 6));
 
   const [totals, setTotals] = useState<ContractTotal[]>([]);
+  const [colors, setColors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
 
   const reqId = useRef(0);
 
   useEffect(() => {
     load(start, end);
+    api
+      .getColors()
+      .then(setColors)
+      .catch(() => setColors({}));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -154,7 +160,10 @@ export default function WeeklyByContract() {
                       <div className="bar-row__track">
                         <div
                           className="bar-row__fill"
-                          style={{ width: `${pct}%` }}
+                          style={{
+                            width: `${pct}%`,
+                            background: colorForProject(row.project_id, colors),
+                          }}
                         />
                         <span
                           className="bar-row__value num"

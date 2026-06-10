@@ -45,3 +45,15 @@ export function formatDayHeading(iso: string): string {
 export function formatHours(h: number): string {
   return `${Number(h.toFixed(2))}h`;
 }
+
+/** "HH:00" label for an integer hour (0..24), e.g. 9 -> "09:00". */
+export function formatHourLabel(hour: number): string {
+  return `${String(hour).padStart(2, "0")}:00`;
+}
+
+/** Local decimal hour-of-day for an ISO datetime, e.g. 09:30 -> 9.5. */
+export function decimalHour(iso: string): number {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return 0;
+  return d.getHours() + d.getMinutes() / 60;
+}
