@@ -8,14 +8,15 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
-    ICAL_URL: str
-    ODOO_URL: str
-    ODOO_DB: str
-    ODOO_USERNAME: str
-    ODOO_API_KEY: str
+    GOOGLE_CALENDAR_URL: str = ""
+    ODOO_URL: str = ""
+    ODOO_DB: str = ""
+    ODOO_USERNAME: str = ""
+    ODOO_API_KEY: str = ""
     LOCAL_TZ: str = "Europe/Lisbon"
     USER_EMAIL: str = ""
     DATA_DIR: str = "data"
+    DEMO_MODE: bool = False
 
     @field_validator("LOCAL_TZ")
     @classmethod

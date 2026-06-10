@@ -6,6 +6,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app import deps
+from app.colors import ColorStore
 from app.config import Settings
 from app.main import app
 from app.ledger import Ledger
@@ -18,6 +19,7 @@ from app.schemas import CalendarEvent, OdooRef
 def client(tmp_path, monkeypatch):
     rs = RulesStore(tmp_path / "rules.json")
     lg = Ledger(tmp_path / "ledger.json")
+    cs = ColorStore(tmp_path / "project_colors.json")
 
     fake_odoo = MagicMock(spec=OdooClient)
     fake_odoo.list_projects.return_value = [OdooRef(id=10, name="GreenVolt")]
@@ -26,11 +28,12 @@ def client(tmp_path, monkeypatch):
     fake_odoo.test_connection.return_value = True
 
     fake_settings = Settings(
-        ICAL_URL="https://example.com/calendar.ics",
+        GOOGLE_CALENDAR_URL="https://example.com/calendar.ics",
         ODOO_URL="https://odoo.example.com",
         ODOO_DB="testdb",
         ODOO_USERNAME="user@example.com",
         ODOO_API_KEY="testkey",
+        DEMO_MODE=False,
         DATA_DIR=str(tmp_path),
     )
 
@@ -38,6 +41,7 @@ def client(tmp_path, monkeypatch):
     app.dependency_overrides[deps.ledger] = lambda: lg
     app.dependency_overrides[deps.odoo] = lambda: fake_odoo
     app.dependency_overrides[deps.settings] = lambda: fake_settings
+    app.dependency_overrides[deps.colors_store] = lambda: cs
 
     yield TestClient(app), fake_odoo, lg
     app.dependency_overrides.clear()
@@ -112,6 +116,92 @@ def test_calendar_events_returns_502_when_ical_fails(client, monkeypatch):
     assert "Failed to load calendar" in resp.json()["detail"]
 
 
+@pytest.fixture
+def demo_client(tmp_path):
+    rs = RulesStore(tmp_path / "rules.json")
+    lg = Ledger(tmp_path / "ledger.json")
+    cs = ColorStore(tmp_path / "project_colors.json")
+
+    demo_settings = Settings(
+        GOOGLE_CALENDAR_URL="",
+        ODOO_URL="",
+        ODOO_DB="",
+        ODOO_USERNAME="",
+        ODOO_API_KEY="",
+        DEMO_MODE=True,
+        DATA_DIR=str(tmp_path),
+    )
+
+    app.dependency_overrides[deps.rules_store] = lambda: rs
+    app.dependency_overrides[deps.ledger] = lambda: lg
+    app.dependency_overrides[deps.settings] = lambda: demo_settings
+    app.dependency_overrides[deps.colors_store] = lambda: cs
+
+    yield TestClient(app), lg
+    app.dependency_overrides.clear()
+
+
+def test_demo_projects(demo_client):
+    c, _ = demo_client
+    resp = c.get("/api/odoo/projects")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert len(data) == 3
+    names = {p["name"] for p in data}
+    assert "GreenVolt" in names
+    assert "Lisport" in names
+    assert "Internal" in names
+
+
+def test_demo_events_returns_sample(demo_client):
+    c, _ = demo_client
+    resp = c.get("/api/calendar/events?start=2026-06-08&end=2026-06-12")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert len(data) >= 1
+    # At least one entry should have overlaps=True (two events share time on same day)
+    assert any(entry["overlaps"] for entry in data)
+
+
+def test_demo_push_simulates_and_dedups(demo_client):
+    c, lg = demo_client
+    entry = {
+        "uid": "demo-1",
+        "start": "2026-06-08T09:00:00+01:00",
+        "date": "2026-06-08",
+        "hours": 0.5,
+        "description": "GreenVolt standup",
+        "project_id": 101,
+        "task_id": 1001,
+    }
+    resp = c.post("/api/timesheet/push", json={"entries": [entry]})
+    assert resp.status_code == 200
+    result = resp.json()["results"][0]
+    assert result["success"] is True
+    assert result["odoo_line_id"] is not None
+
+    # Verify ledger recorded it
+    from datetime import datetime, timezone
+    start_dt = datetime.fromisoformat(entry["start"])
+    assert lg.is_logged("demo-1", start_dt) is True
+
+    # Push again — should be already logged
+    resp2 = c.post("/api/timesheet/push", json={"entries": [entry]})
+    result2 = resp2.json()["results"][0]
+    assert result2["success"] is False
+    assert "already logged" in result2["error"].lower()
+
+
+def test_demo_test_connection(demo_client):
+    c, _ = demo_client
+    resp = c.post("/api/settings/test-connection")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["odoo"] is True
+    assert body["calendar"] is True
+    assert body["errors"] == {}
+
+
 def test_daily_groups_events_by_date(client, monkeypatch):
     c, _, _ = client
 
@@ -153,3 +243,38 @@ def test_daily_groups_events_by_date(client, monkeypatch):
     assert "2026-06-01" in body
     assert "2026-06-02" in body
     assert len(body["2026-06-01"]) == 2
+
+
+def test_colors_get_empty_initially(client):
+    c, _, _ = client
+    resp = c.get("/api/colors")
+    assert resp.status_code == 200
+    assert resp.json() == {}
+
+
+def test_colors_put_and_get(client):
+    c, _, _ = client
+    resp = c.put("/api/colors/101", json={"color": "#3B82F6"})
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["101"] == "#3B82F6"
+
+    resp2 = c.get("/api/colors")
+    assert resp2.status_code == 200
+    assert resp2.json()["101"] == "#3B82F6"
+
+
+def test_colors_put_invalid_color_returns_422(client):
+    c, _, _ = client
+    resp = c.put("/api/colors/101", json={"color": "blue"})
+    assert resp.status_code == 422
+
+
+def test_colors_put_multiple_projects(client):
+    c, _, _ = client
+    c.put("/api/colors/101", json={"color": "#3B82F6"})
+    resp = c.put("/api/colors/102", json={"color": "#D97706"})
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["101"] == "#3B82F6"
+    assert body["102"] == "#D97706"

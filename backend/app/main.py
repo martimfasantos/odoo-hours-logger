@@ -5,16 +5,17 @@ from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from app import deps
+from app import demo, deps
 from app.aggregations import weekly_by_contract
 from app.calendar_source import fetch_ical, parse_events
 from app.config import Settings
 from app.ledger import Ledger
 from app.matcher import match_title
 from app.odoo_client import OdooClient
+from app.colors import ColorStore
 from app.rules import RulesStore
 from app.schemas import (
-    CalendarEvent, ContractTotal, OdooRef, ProposedEntry,
+    CalendarEvent, ColorUpdate, ContractTotal, OdooRef, ProposedEntry,
     PushEntry, PushResult, Rule, RuleCreate,
 )
 
@@ -55,8 +56,10 @@ def _build_proposals(events: list[CalendarEvent], rules: list[Rule],
 
 
 def _load_events(start: Date, end: Date, settings: Settings) -> list[CalendarEvent]:
+    if settings.DEMO_MODE:
+        return demo.demo_events(start, end, settings.LOCAL_TZ)
     try:
-        ics = fetch_ical(settings.ICAL_URL)
+        ics = fetch_ical(settings.GOOGLE_CALENDAR_URL)
         return parse_events(ics, start, end, settings.LOCAL_TZ, settings.USER_EMAIL)
     except HTTPException:
         raise
@@ -70,12 +73,19 @@ def health():
 
 
 @app.get("/api/odoo/projects", response_model=list[OdooRef])
-def projects(odoo: OdooClient = Depends(deps.odoo)):
+def projects(settings: Settings = Depends(deps.settings),
+             odoo: OdooClient = Depends(deps.odoo)):
+    if settings.DEMO_MODE:
+        return demo.DEMO_PROJECTS
     return odoo.list_projects()
 
 
 @app.get("/api/odoo/projects/{project_id}/tasks", response_model=list[OdooRef])
-def tasks(project_id: int, odoo: OdooClient = Depends(deps.odoo)):
+def tasks(project_id: int,
+          settings: Settings = Depends(deps.settings),
+          odoo: OdooClient = Depends(deps.odoo)):
+    if settings.DEMO_MODE:
+        return demo.DEMO_TASKS.get(project_id, [])
     return odoo.list_tasks(project_id)
 
 
@@ -136,15 +146,37 @@ def delete_rule(rule_id: int, rules: RulesStore = Depends(deps.rules_store)):
     return {"status": "deleted"}
 
 
+@app.get("/api/colors", response_model=dict[str, str])
+def get_colors(colors: ColorStore = Depends(deps.colors_store)):
+    return colors.get_all()
+
+
+@app.put("/api/colors/{project_id}", response_model=dict[str, str])
+def set_color(project_id: int, body: ColorUpdate,
+              colors: ColorStore = Depends(deps.colors_store)):
+    colors.set(project_id, body.color)
+    return colors.get_all()
+
+
 @app.post("/api/timesheet/push", response_model=PushResponse)
 def push(req: PushRequest,
+         settings: Settings = Depends(deps.settings),
          odoo: OdooClient = Depends(deps.odoo),
          ledger: Ledger = Depends(deps.ledger)):
     results: list[PushResult] = []
-    for entry in req.entries:
+    for idx, entry in enumerate(req.entries):
         if ledger.is_logged(entry.uid, entry.start):
             results.append(PushResult(uid=entry.uid, start=entry.start,
                                       success=False, error="Already logged"))
+            continue
+        if settings.DEMO_MODE:
+            sim_line_id = 9000 + idx
+            ledger.record(entry.uid, entry.start, odoo_line_id=sim_line_id,
+                          project_id=entry.project_id, task_id=entry.task_id,
+                          hours=entry.hours,
+                          pushed_at=datetime.now(timezone.utc).isoformat())
+            results.append(PushResult(uid=entry.uid, start=entry.start,
+                                      success=True, odoo_line_id=sim_line_id))
             continue
         try:
             line_id = odoo.create_timesheet(
@@ -167,14 +199,16 @@ def push(req: PushRequest,
 @app.post("/api/settings/test-connection")
 def test_connection(settings: Settings = Depends(deps.settings),
                     odoo: OdooClient = Depends(deps.odoo)):
-    result = {"odoo": False, "ical": False, "errors": {}}
+    if settings.DEMO_MODE:
+        return {"odoo": True, "calendar": True, "errors": {}}
+    result = {"odoo": False, "calendar": False, "errors": {}}
     try:
         result["odoo"] = odoo.test_connection()
     except Exception as exc:
         result["errors"]["odoo"] = str(exc)
     try:
-        fetch_ical(settings.ICAL_URL)
-        result["ical"] = True
+        fetch_ical(settings.GOOGLE_CALENDAR_URL)
+        result["calendar"] = True
     except Exception as exc:
-        result["errors"]["ical"] = str(exc)
+        result["errors"]["calendar"] = str(exc)
     return result

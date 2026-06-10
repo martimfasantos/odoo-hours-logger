@@ -2,4 +2,4 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 . .venv/bin/activate
-uvicorn app.main:app --reload --port 8000
+uvicorn app.main:app --reload --port 8010

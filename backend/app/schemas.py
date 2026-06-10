@@ -1,8 +1,9 @@
+import re
 from datetime import date as Date
 from datetime import datetime
 from typing import Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class CalendarEvent(BaseModel):
@@ -74,3 +75,14 @@ class ContractTotal(BaseModel):
     task_id: Optional[int] = None
     task_name: Optional[str] = None
     hours: float
+
+
+class ColorUpdate(BaseModel):
+    color: str
+
+    @field_validator("color")
+    @classmethod
+    def _hex(cls, v: str) -> str:
+        if not re.fullmatch(r"#[0-9a-fA-F]{6}", v):
+            raise ValueError("color must be a #RRGGBB hex string")
+        return v

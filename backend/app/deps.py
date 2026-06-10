@@ -1,5 +1,6 @@
 from functools import lru_cache
 
+from app.colors import ColorStore
 from app.config import Settings, get_settings
 from app.ledger import Ledger
 from app.odoo_client import OdooClient
@@ -19,6 +20,11 @@ def rules_store() -> RulesStore:
 @lru_cache
 def ledger() -> Ledger:
     return Ledger(settings().data_path("ledger.json"))
+
+
+@lru_cache
+def colors_store() -> ColorStore:
+    return ColorStore(settings().data_path("project_colors.json"))
 
 
 @lru_cache
