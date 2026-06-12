@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { CalendarX2 } from "lucide-react";
+import { CalendarX2, Check, ChevronLeft, ChevronRight } from "lucide-react";
 import type { OdooRef, ProposedEntry } from "../api/types";
 import {
   addDays,
@@ -8,6 +8,7 @@ import {
   formatHourLabel,
   formatHours,
   formatTime,
+  formatWeekRange,
 } from "../lib/dates";
 import { colorForProject, UNASSIGNED_COLOR } from "../lib/colors";
 
@@ -25,6 +26,8 @@ interface DailyCalendarProps {
   weekStartISO: string; // Monday of the week to show (YYYY-MM-DD)
   colors: Record<string, string>;
   onSetColor: (projectId: number, color: string) => void;
+  onPrevWeek: () => void;
+  onNextWeek: () => void;
 }
 
 const HOUR_PX = 48;
@@ -58,6 +61,8 @@ export default function DailyCalendar({
   weekStartISO,
   colors,
   onSetColor,
+  onPrevWeek,
+  onNextWeek,
 }: DailyCalendarProps) {
   const projectNameById = useMemo(() => {
     const m = new Map<number, string>();
@@ -169,9 +174,30 @@ export default function DailyCalendar({
     );
   }
 
+  const weekLabel = formatWeekRange(weekStartISO);
+
   return (
     <div className="card calendar">
       <div className="cal-header">
+        <div className="cal-nav">
+          <button
+            type="button"
+            className="cal-nav__btn"
+            aria-label="Previous week"
+            onClick={onPrevWeek}
+          >
+            <ChevronLeft size={18} aria-hidden="true" />
+          </button>
+          <span className="cal-nav__label">{weekLabel}</span>
+          <button
+            type="button"
+            className="cal-nav__btn"
+            aria-label="Next week"
+            onClick={onNextWeek}
+          >
+            <ChevronRight size={18} aria-hidden="true" />
+          </button>
+        </div>
         <span className="cal-week-total num" aria-label={`Week total ${formatHours(weekTotal)}`}>
           Week total: {formatHours(weekTotal)}
         </span>
@@ -222,11 +248,12 @@ export default function DailyCalendar({
                   const top = (ev.startHour - gridStartHour) * HOUR_PX;
                   const height = Math.max(ev.hours * HOUR_PX, MIN_BLOCK_PX);
                   const widthPct = 100 / ev.clusterCols;
-                  const fullText = `${formatTime(ev.proposal.event.start)} ${ev.proposal.event.title} — ${formatHours(ev.hours)} (${ev.projectName})`;
+                  const isLogged = ev.proposal.already_logged;
+                  const fullText = `${formatTime(ev.proposal.event.start)} ${ev.proposal.event.title} — ${formatHours(ev.hours)} (${ev.projectName})${isLogged ? " — logged" : ""}`;
                   return (
                     <div
                       key={rowKey(ev.proposal)}
-                      className="cal-event"
+                      className={`cal-event${isLogged ? " cal-event--logged" : ""}`}
                       title={fullText}
                       aria-label={fullText}
                       style={{
@@ -243,6 +270,11 @@ export default function DailyCalendar({
                       <span className="cal-event-title">
                         {ev.proposal.event.title}
                       </span>
+                      {isLogged && (
+                        <span className="cal-event-logged-icon" aria-hidden="true">
+                          <Check size={10} strokeWidth={3} />
+                        </span>
+                      )}
                     </div>
                   );
                 })}

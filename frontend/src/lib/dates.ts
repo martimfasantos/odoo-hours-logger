@@ -51,6 +51,28 @@ export function formatHourLabel(hour: number): string {
   return `${String(hour).padStart(2, "0")}:00`;
 }
 
+/**
+ * Week-range label from a Monday YYYY-MM-DD string, e.g. "Jun 8 - Jun 14, 2026".
+ * Spans Monday..Sunday (weekStart + 6 days).
+ */
+export function formatWeekRange(weekStartISO: string): string {
+  const start = new Date(`${weekStartISO}T00:00:00`);
+  const end = new Date(`${addDays(weekStartISO, 6)}T00:00:00`);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+    return weekStartISO;
+  }
+  const startLabel = start.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+  });
+  const endLabel = end.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+  return `${startLabel} - ${endLabel}`;
+}
+
 /** Local decimal hour-of-day for an ISO datetime, e.g. 09:30 -> 9.5. */
 export function decimalHour(iso: string): number {
   const d = new Date(iso);

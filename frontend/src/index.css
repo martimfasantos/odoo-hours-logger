@@ -282,6 +282,10 @@ a {
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
+.field__hint {
+  font-size: 0.72rem;
+  color: var(--color-text-muted);
+}
 
 .input,
 .select {
@@ -438,9 +442,9 @@ a {
   border-color: var(--color-border);
 }
 .badge--logged {
-  background: #ECFDF3;
-  color: var(--color-success);
-  border-color: #BBF7D0;
+  background: #475569;
+  color: #FFFFFF;
+  border-color: #334155;
 }
 .badge--warning {
   background: #FEF3E2;
@@ -518,10 +522,95 @@ a {
   max-width: 320px;
 }
 .row--logged {
-  background: #FBFDFB;
+  background: #E2E8F0;
+}
+.row--logged td {
+  color: #64748B;
+}
+/* Dim inline controls on logged rows so the whole row reads as locked */
+.row--logged .input,
+.row--logged .select,
+.row--logged .input--cell,
+.row--logged .select--cell {
+  opacity: 0.55;
+}
+.row--logged:hover {
+  background: #D8E1ED;
 }
 .row--failed {
   background: #FEF6F6;
+}
+
+/* ============================================================
+   Global select-all bar (DailyView)
+   ============================================================ */
+.select-all-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-3) var(--space-5);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+}
+.select-all-bar__control {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--color-fg);
+  cursor: pointer;
+  user-select: none;
+}
+.select-all-bar__meta {
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+}
+
+/* ============================================================
+   Week group (DailyView) — outer grouping above day groups
+   ============================================================ */
+.week-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.week-group__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-5);
+  background: var(--color-fg);
+  color: var(--color-on-primary);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+}
+.week-group__range {
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+.week-group__total {
+  margin-left: auto;
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+.week-group__approve-all {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--color-on-primary);
+  cursor: pointer;
+  user-select: none;
+  margin-left: var(--space-4);
+}
+.week-group__approve-all .checkbox {
+  accent-color: var(--color-on-primary);
 }
 
 /* ============================================================
@@ -695,7 +784,7 @@ a {
 .cal-header {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: space-between;
   gap: var(--space-3);
   padding: var(--space-3) var(--space-5);
   border-bottom: 1px solid var(--color-border);
@@ -704,6 +793,42 @@ a {
   font-size: 0.95rem;
   font-weight: 700;
   color: var(--color-fg);
+}
+
+.cal-nav {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+.cal-nav__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  color: var(--color-fg);
+  cursor: pointer;
+  transition: background var(--transition), border-color var(--transition),
+    box-shadow var(--transition);
+}
+.cal-nav__btn:hover {
+  border-color: var(--color-secondary);
+  background: var(--color-muted);
+}
+.cal-nav__btn:focus-visible {
+  outline: 2px solid var(--color-ring);
+  outline-offset: 2px;
+}
+.cal-nav__label {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--color-fg);
+  min-width: 160px;
+  text-align: center;
 }
 
 .cal-grid {
@@ -798,6 +923,22 @@ a {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+/* Logged calendar event: desaturated / greyed out */
+.cal-event--logged {
+  opacity: 0.6;
+  filter: saturate(0.25) brightness(0.9);
+}
+.cal-event--logged .cal-event-logged-icon {
+  display: flex;
+  align-items: center;
+  position: absolute;
+  top: 3px;
+  right: 4px;
+  opacity: 0.9;
+}
+.cal-event-logged-icon {
+  display: none;
 }
 
 /* Color legend */
