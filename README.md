@@ -1,78 +1,60 @@
 # Odoo Hours Logger
 
-Log Google Calendar hours into Odoo timesheets — locally, with a review step before anything is written.
+Log Google Calendar hours into Daredata's Odoo — locally, with a review step before anything is written.
 
 ## How it works
 
-Calendar events are fetched from a private iCal URL, matched to an Odoo Project/Task by keyword rules on the event title (managed in-app), reviewed in the browser, then pushed to Odoo as timesheet lines. A local `data/ledger.json` prevents double-logging. No database — rules and the dedup ledger are plain JSON files.
+Calendar events are fetched from your Google Calendar's secret iCal URL, matched to an Odoo **contract** by keyword rules on the event title (managed in-app), reviewed in the browser, then pushed to Odoo. Odoo here is Daredata's custom **`timesheet_entry`** model, reached over its **session-based web JSON-RPC API** (no API key — it reuses your browser session). A local `data/ledger.json` plus a check against existing Odoo entries prevents double-logging.
 
-All-day events, declined events, and recurring event expansions are handled automatically. There is no database and no LLM/AI — matching is plain keyword substring matching on the event title.
+All-day, declined, and recurring events are handled automatically. There is no database and no LLM/AI — matching is plain keyword substring matching on the event title; rules and the dedup ledger are plain JSON files.
 
 ## Prerequisites
 
 - **Python 3.12+**
 - **Node.js 18+** and npm
-- Your private Google Calendar iCal URL (Calendar settings → "Secret address in iCal format")
-- Access to your Odoo instance: URL, database name, login email, and an API key or password
+- Your Google Calendar **secret iCal URL** (Calendar → Settings → Integrate calendar → "Secret address in iCal format")
+- A logged-in Odoo browser session (you'll copy a `session_id` cookie — see below)
 
 ## Setup
 
-### Backend
-
 ```bash
-cd backend
-python -m venv .venv
-. .venv/bin/activate
-pip install -e ".[dev]"
+# Backend
+cd backend && python -m venv .venv && . .venv/bin/activate && pip install -e ".[dev]"
+# Frontend
+cd ../frontend && npm install
 ```
 
-Copy `.env.example` to `.env` and fill in your values:
-
-```bash
-cp backend/.env.example backend/.env
-```
+Copy `backend/.env.example` to `backend/.env` and fill it in:
 
 | Variable | Description |
 |---|---|
-| `GOOGLE_CALENDAR_URL` | Your private Google Calendar secret address URL (Calendar settings → "Secret address in iCal format") |
-| `ODOO_URL` | Odoo instance URL (e.g. `https://mycompany.odoo.com`) |
-| `ODOO_DB` | Odoo database name |
-| `ODOO_USERNAME` | Your Odoo login email |
-| `ODOO_API_KEY` | Your Odoo XML-RPC credential — an API key **or** your account password. An API key is required if your account has 2FA; generate one under your Odoo **Preferences → Account Security → New API Key** |
-| `LOCAL_TZ` | Your local timezone (default: `Europe/Lisbon`) |
-| `USER_EMAIL` | Your email, used to detect declined calendar events |
-| `DATA_DIR` | Directory for `rules.json` and `ledger.json` (default: `data`) |
+| `GOOGLE_CALENDAR_URL` | Google Calendar secret iCal URL |
+| `ODOO_URL` | `https://erp.daredata.engineering` |
+| `ODOO_DB` | `odoo` |
+| `ODOO_SESSION_ID` | Your Odoo session cookie — DevTools → Application → Cookies → `session_id`. **Expires periodically**; re-copy when the connection test fails. |
+| `ODOO_VISITOR_UUID` | `visitor_uuid` cookie (optional; leave blank if absent) |
+| `ODOO_USER_ID`, `ODOO_NETWORK_MEMBER_ID` | Optional — auto-discovered from the session when blank |
+| `LOCAL_TZ` | Local timezone (default `Europe/Lisbon`) |
+| `USER_EMAIL` | Your email, used to skip declined calendar events |
+| `DATA_DIR` | Directory for `rules.json` / `ledger.json` (default `data`) |
 
-### Frontend
-
-```bash
-cd frontend
-npm install
-```
+> This Odoo has no API keys, so auth uses your browser session. The `session_id` is a temporary token — when it expires, the Settings page shows "session expired" and you paste a fresh one.
 
 ## Run
 
-Start both servers (two terminals):
+One command from the repo root starts both services and prints both URLs (Ctrl-C stops both):
 
 ```bash
-# Terminal 1 — backend (http://localhost:8010)
-cd backend && ./run.sh
-
-# Terminal 2 — frontend (http://localhost:5173)
-cd frontend && npm run dev
+./run.sh
 ```
 
-Then open [http://localhost:5173](http://localhost:5173).
+Then open **http://localhost:5173** (backend API runs on http://localhost:8010).
+
+Or run them separately: `cd backend && ./run.sh` and `cd frontend && npm run dev`.
 
 ## Try the UI with demo data (no credentials)
 
-To explore the interface without any Google Calendar or Odoo setup, run in **demo mode**: the backend serves sample projects, tasks, and calendar events, and "Push approved" is simulated (nothing is sent to Odoo).
-
-1. Copy the env template if you haven't: `cp backend/.env.example backend/.env`
-2. Set `DEMO_MODE=true` in `backend/.env` (the other values can stay blank).
-3. Start both servers (above) and open the app — the Daily, Weekly, and Mapping Rules pages are fully clickable with sample data, and pushing flips rows to "Logged".
-
-Set `DEMO_MODE=false` and fill in your real credentials for live use.
+Set `DEMO_MODE=true` in `backend/.env` to explore the UI with sample contracts and calendar events; "Push approved" is simulated (nothing is sent to Odoo). Set `DEMO_MODE=false` and fill in real values for live use.
 
 ## Test
 
@@ -80,16 +62,13 @@ Set `DEMO_MODE=false` and fill in your real credentials for live use.
 cd backend && . .venv/bin/activate && pytest
 ```
 
-50 tests, all green.
+75 tests, all green.
 
 ## First-time live verification
 
-After filling in `.env` with real credentials:
-
-1. **Settings** → click "Test connection" → confirm both Odoo and Google Calendar show green.
-2. **Mapping Rules** → add at least one rule (keyword → Odoo project/task).
-3. **Daily Hours** → pick a date range → click "Refresh from calendar" → events appear with proposed matches.
-4. Edit any match if needed, approve rows, then click "Push approved" → check for ✓ results.
-5. Reload the page — pushed entries appear as "Logged" (dedup is working).
-6. Confirm the timesheet line exists in Odoo under Timesheets.
-7. **Weekly by Contract** → totals reflect the pushed hours.
+1. **Settings** → "Test connection" → confirm both Odoo and Google Calendar show green (if Odoo is red with a session message, re-copy `ODOO_SESSION_ID`).
+2. **Mapping Rules** → add a rule (keyword in the event title → an Odoo contract).
+3. **Daily Hours** → pick a week range → "Refresh from calendar" → events appear with proposed contract matches.
+4. Adjust contracts/descriptions, approve rows, then "Push approved to Odoo" → check for ✓ results.
+5. Reload — pushed entries appear greyed-out and "Logged" (dedup is working).
+6. Confirm the entry exists in Odoo; **Weekly by contract** totals reflect the pushed hours.
