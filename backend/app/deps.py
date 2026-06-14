@@ -2,6 +2,7 @@ from functools import lru_cache
 
 from app.colors import ColorStore
 from app.config import Settings, get_settings
+from app.ignore import IgnoreStore
 from app.ledger import Ledger
 from app.odoo_client import OdooClient
 from app.rules import RulesStore
@@ -25,6 +26,11 @@ def ledger() -> Ledger:
 @lru_cache
 def colors_store() -> ColorStore:
     return ColorStore(settings().data_path("project_colors.json"))
+
+
+@lru_cache
+def ignore_store() -> IgnoreStore:
+    return IgnoreStore(settings().data_path("ignore_keywords.json"))
 
 
 @lru_cache

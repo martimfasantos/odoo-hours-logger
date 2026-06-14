@@ -35,6 +35,7 @@ class OdooClient:
         self._network_member_id_override = network_member_id
         self._uid: Optional[int] = None
         self._network_member_id: Optional[int] = None
+        self._user_email: Optional[str] = None
 
         cookies = {"session_id": session_id}
         if visitor_uuid:
@@ -100,6 +101,12 @@ class OdooClient:
             self._uid = uid
         return self._uid
 
+    def user_email(self) -> str:
+        if self._user_email is None:
+            info = self.session_info() or {}
+            self._user_email = info.get("username") or ""
+        return self._user_email
+
     def network_member_id(self) -> int:
         if self._network_member_id_override:
             return self._network_member_id_override
@@ -118,7 +125,9 @@ class OdooClient:
     # -- reads --------------------------------------------------------------
 
     def list_contracts(self, query: str = "", limit: int = 500) -> list[OdooRef]:
-        domain = [["display_name", "ilike", query]] if query else []
+        domain: list = [["network_member", "=", self.network_member_id()]]
+        if query:
+            domain.append(["display_name", "ilike", query])
         rows = self.call_kw(
             "contract", "search_read",
             [domain],

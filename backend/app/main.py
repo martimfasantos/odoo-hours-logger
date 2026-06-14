@@ -9,6 +9,7 @@ from app import demo, deps
 from app.aggregations import weekly_by_contract
 from app.calendar_source import fetch_ical, parse_events
 from app.config import Settings
+from app.ignore import IgnoreStore
 from app.ledger import Ledger
 from app.matcher import match_title
 from app.odoo_client import OdooClient, OdooSessionExpired, to_odoo_utc
@@ -35,6 +36,21 @@ class PushRequest(BaseModel):
 
 class PushResponse(BaseModel):
     results: list[PushResult]
+
+
+class IgnoreUpdate(BaseModel):
+    keywords: list[str]
+
+
+def _is_ignored(title: str, keywords: list[str]) -> bool:
+    """Return True if any keyword (lowercased, trimmed, non-empty) is a
+    substring of title.lower()."""
+    title_lower = title.lower()
+    for kw in keywords:
+        kw_clean = kw.strip().lower()
+        if kw_clean and kw_clean in title_lower:
+            return True
+    return False
 
 
 def _odoo_entry_keys(events: list[CalendarEvent], odoo: OdooClient,
@@ -85,12 +101,30 @@ def _build_proposals(events: list[CalendarEvent], rules: list[Rule],
     return proposals
 
 
-def _load_events(start: Date, end: Date, settings: Settings) -> list[CalendarEvent]:
+def _resolve_user_email(settings: Settings, odoo: OdooClient) -> str:
+    """Return the effective user email for declined-event detection.
+
+    Priority:
+    1. ``settings.USER_EMAIL`` if set (explicit override).
+    2. Email auto-derived from the Odoo session (``get_session_info`` → username).
+    3. Empty string if the session call fails (best-effort; declined events will
+       not be filtered, but the request won't fail).
+    """
+    if settings.USER_EMAIL:
+        return settings.USER_EMAIL
+    try:
+        return odoo.user_email()
+    except Exception:
+        return ""
+
+
+def _load_events(start: Date, end: Date, settings: Settings,
+                 user_email: str = "") -> list[CalendarEvent]:
     if settings.DEMO_MODE:
         return demo.demo_events(start, end, settings.LOCAL_TZ)
     try:
         ics = fetch_ical(settings.GOOGLE_CALENDAR_URL)
-        return parse_events(ics, start, end, settings.LOCAL_TZ, settings.USER_EMAIL)
+        return parse_events(ics, start, end, settings.LOCAL_TZ, user_email)
     except HTTPException:
         raise
     except Exception as exc:
@@ -116,8 +150,12 @@ def calendar_events(start: Date, end: Date,
                     settings: Settings = Depends(deps.settings),
                     rules: RulesStore = Depends(deps.rules_store),
                     ledger: Ledger = Depends(deps.ledger),
-                    odoo: OdooClient = Depends(deps.odoo)):
-    events = _load_events(start, end, settings)
+                    odoo: OdooClient = Depends(deps.odoo),
+                    ignore_store: IgnoreStore = Depends(deps.ignore_store)):
+    user_email = settings.USER_EMAIL if settings.DEMO_MODE else _resolve_user_email(settings, odoo)
+    events = _load_events(start, end, settings, user_email)
+    kws = ignore_store.get()
+    events = [ev for ev in events if not _is_ignored(ev.title, kws)]
     return _build_proposals(events, rules.list(), ledger, odoo,
                             settings.DEMO_MODE)
 
@@ -127,8 +165,12 @@ def daily(start: Date, end: Date,
           settings: Settings = Depends(deps.settings),
           rules: RulesStore = Depends(deps.rules_store),
           ledger: Ledger = Depends(deps.ledger),
-          odoo: OdooClient = Depends(deps.odoo)):
-    events = _load_events(start, end, settings)
+          odoo: OdooClient = Depends(deps.odoo),
+          ignore_store: IgnoreStore = Depends(deps.ignore_store)):
+    user_email = settings.USER_EMAIL if settings.DEMO_MODE else _resolve_user_email(settings, odoo)
+    events = _load_events(start, end, settings, user_email)
+    kws = ignore_store.get()
+    events = [ev for ev in events if not _is_ignored(ev.title, kws)]
     proposals = _build_proposals(events, rules.list(), ledger, odoo,
                                  settings.DEMO_MODE)
     by_day: dict[str, list[ProposedEntry]] = {}
@@ -142,11 +184,26 @@ def weekly(start: Date, end: Date,
            settings: Settings = Depends(deps.settings),
            rules: RulesStore = Depends(deps.rules_store),
            ledger: Ledger = Depends(deps.ledger),
-           odoo: OdooClient = Depends(deps.odoo)):
-    events = _load_events(start, end, settings)
+           odoo: OdooClient = Depends(deps.odoo),
+           ignore_store: IgnoreStore = Depends(deps.ignore_store)):
+    user_email = settings.USER_EMAIL if settings.DEMO_MODE else _resolve_user_email(settings, odoo)
+    events = _load_events(start, end, settings, user_email)
+    kws = ignore_store.get()
+    events = [ev for ev in events if not _is_ignored(ev.title, kws)]
     proposals = _build_proposals(events, rules.list(), ledger, odoo,
                                  settings.DEMO_MODE)
     return weekly_by_contract(proposals)
+
+
+@app.get("/api/ignore", response_model=list[str])
+def get_ignore(ignore_store: IgnoreStore = Depends(deps.ignore_store)):
+    return ignore_store.get()
+
+
+@app.put("/api/ignore", response_model=list[str])
+def put_ignore(body: IgnoreUpdate,
+               ignore_store: IgnoreStore = Depends(deps.ignore_store)):
+    return ignore_store.set(body.keywords)
 
 
 @app.get("/api/rules", response_model=list[Rule])

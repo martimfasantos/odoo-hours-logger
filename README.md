@@ -35,7 +35,7 @@ Copy `backend/.env.example` to `backend/.env` and fill it in:
 | `ODOO_VISITOR_UUID` | `visitor_uuid` cookie (optional; leave blank if absent) |
 | `ODOO_USER_ID`, `ODOO_NETWORK_MEMBER_ID` | Optional — auto-discovered from the session when blank |
 | `LOCAL_TZ` | Local timezone (default `Europe/Lisbon`) |
-| `USER_EMAIL` | Your email, used to skip declined calendar events |
+| `USER_EMAIL` | Optional — auto-derived from the Odoo session when blank. Set to override (e.g. when your calendar address differs from your Odoo login). Used to skip declined events. |
 | `DATA_DIR` | Directory for `rules.json` / `ledger.json` (default `data`) |
 
 > This Odoo has no API keys, so auth uses your browser session. The `session_id` is a temporary token — when it expires, the Settings page shows "session expired" and you paste a fresh one.

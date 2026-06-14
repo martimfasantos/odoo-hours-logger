@@ -72,30 +72,50 @@ def test_call_kw_envelope_and_shape():
 
 
 def test_list_contracts_parses_rows():
+    # Use network_member_id override to avoid an extra round-trip.
     c, http = _client([_ok([
         {"id": 10, "display_name": "[10] Client A"},
         {"id": 20, "display_name": "[20] Client B"},
-    ])])
+    ])], network_member_id=1095)
     contracts = c.list_contracts()
     assert [(r.id, r.name) for r in contracts] == [
         (10, "[10] Client A"), (20, "[20] Client B")]
     _, body = http.calls[0]
     params = body["params"]
     assert params["model"] == "contract"
-    assert params["args"] == [[]]
+    # Domain must include the network_member filter.
+    domain = params["args"][0]
+    assert ["network_member", "=", 1095] in domain
     assert params["kwargs"]["fields"] == ["display_name"]
     assert params["kwargs"]["order"] == "display_name"
 
 
 def test_list_contracts_applies_ilike_query():
-    c, http = _client([_ok([])])
+    c, http = _client([_ok([])], network_member_id=1095)
     c.list_contracts(query="green")
     _, body = http.calls[0]
-    assert body["params"]["args"] == [[["display_name", "ilike", "green"]]]
+    domain = body["params"]["args"][0]
+    assert ["network_member", "=", 1095] in domain
+    assert ["display_name", "ilike", "green"] in domain
+
+
+def test_list_contracts_no_query_excludes_ilike():
+    c, http = _client([_ok([])], network_member_id=1095)
+    c.list_contracts()
+    _, body = http.calls[0]
+    domain = body["params"]["args"][0]
+    assert ["network_member", "=", 1095] in domain
+    # When there is no query, there must be no display_name ilike filter.
+    assert not any(
+        (isinstance(clause, list) and len(clause) >= 2
+         and clause[0] == "display_name")
+        for clause in domain
+    )
 
 
 def test_list_contracts_coerces_falsy_name():
-    c, _ = _client([_ok([{"id": 5, "display_name": False}])])
+    c, _ = _client([_ok([{"id": 5, "display_name": False}])],
+                   network_member_id=1095)
     contracts = c.list_contracts()
     assert contracts[0].id == 5
     assert contracts[0].name == ""
@@ -208,6 +228,29 @@ def test_generic_error_raises_runtime_error():
         c.session_info()
     assert "Boom" in str(excinfo.value)
     assert not isinstance(excinfo.value, OdooSessionExpired)
+
+
+def test_user_email_resolution_and_caching():
+    c, http = _client([
+        _ok({"uid": 1098, "username": "martim.santos@daredata.engineering"}),
+    ])
+    email = c.user_email()
+    assert email == "martim.santos@daredata.engineering"
+    # Second call must use the cached value — no additional network call.
+    assert c.user_email() == email
+    assert len(http.calls) == 1
+    assert http.calls[0][0].endswith("/web/session/get_session_info")
+
+
+def test_user_email_missing_username_returns_empty():
+    c, _ = _client([_ok({"uid": 1098})])
+    assert c.user_email() == ""
+
+
+def test_user_email_propagates_session_expired():
+    c, _ = _client([FakeResponse("<html>login</html>", content_type="text/html")])
+    with pytest.raises(OdooSessionExpired):
+        c.user_email()
 
 
 def test_test_connection_true():

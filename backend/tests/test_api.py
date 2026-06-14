@@ -8,6 +8,7 @@ from fastapi.testclient import TestClient
 from app import deps
 from app.colors import ColorStore
 from app.config import Settings
+from app.ignore import IgnoreStore
 from app.ledger import Ledger
 from app.main import app
 from app.odoo_client import OdooClient
@@ -20,12 +21,14 @@ def client(tmp_path, monkeypatch):
     rs = RulesStore(tmp_path / "rules.json")
     lg = Ledger(tmp_path / "ledger.json")
     cs = ColorStore(tmp_path / "project_colors.json")
+    ig = IgnoreStore(tmp_path / "ignore_keywords.json")
 
     fake_odoo = MagicMock(spec=OdooClient)
     fake_odoo.list_contracts.return_value = [OdooRef(id=10, name="[10] GreenVolt")]
     fake_odoo.existing_entries.return_value = []
     fake_odoo.create_timesheet.return_value = 500
     fake_odoo.test_connection.return_value = True
+    fake_odoo.user_email.return_value = "test.user@example.com"
 
     fake_settings = Settings(
         GOOGLE_CALENDAR_URL="https://example.com/calendar.ics",
@@ -41,6 +44,7 @@ def client(tmp_path, monkeypatch):
     app.dependency_overrides[deps.odoo] = lambda: fake_odoo
     app.dependency_overrides[deps.settings] = lambda: fake_settings
     app.dependency_overrides[deps.colors_store] = lambda: cs
+    app.dependency_overrides[deps.ignore_store] = lambda: ig
 
     yield TestClient(app), fake_odoo, lg
     app.dependency_overrides.clear()
@@ -125,6 +129,7 @@ def demo_client(tmp_path):
     rs = RulesStore(tmp_path / "rules.json")
     lg = Ledger(tmp_path / "ledger.json")
     cs = ColorStore(tmp_path / "project_colors.json")
+    ig = IgnoreStore(tmp_path / "ignore_keywords.json")
 
     demo_settings = Settings(
         GOOGLE_CALENDAR_URL="",
@@ -139,13 +144,14 @@ def demo_client(tmp_path):
     app.dependency_overrides[deps.ledger] = lambda: lg
     app.dependency_overrides[deps.settings] = lambda: demo_settings
     app.dependency_overrides[deps.colors_store] = lambda: cs
+    app.dependency_overrides[deps.ignore_store] = lambda: ig
 
-    yield TestClient(app), lg
+    yield TestClient(app), lg, ig
     app.dependency_overrides.clear()
 
 
 def test_demo_contracts(demo_client):
-    c, _ = demo_client
+    c, _, _ = demo_client
     resp = c.get("/api/odoo/contracts")
     assert resp.status_code == 200
     data = resp.json()
@@ -156,7 +162,7 @@ def test_demo_contracts(demo_client):
 
 
 def test_demo_events_returns_sample(demo_client):
-    c, _ = demo_client
+    c, _, _ = demo_client
     resp = c.get("/api/calendar/events?start=2026-06-08&end=2026-06-12")
     assert resp.status_code == 200
     data = resp.json()
@@ -166,7 +172,7 @@ def test_demo_events_returns_sample(demo_client):
 
 
 def test_demo_push_simulates_and_dedups(demo_client):
-    c, lg = demo_client
+    c, lg, _ = demo_client
     entry = {
         "uid": "demo-1",
         "start": "2026-06-08T09:00:00+01:00",
@@ -192,7 +198,7 @@ def test_demo_push_simulates_and_dedups(demo_client):
 
 
 def test_demo_test_connection(demo_client):
-    c, _ = demo_client
+    c, _, _ = demo_client
     resp = c.post("/api/settings/test-connection")
     assert resp.status_code == 200
     body = resp.json()
@@ -235,7 +241,7 @@ def test_daily_groups_events_by_date(client, monkeypatch):
         ),
     ]
 
-    monkeypatch.setattr("app.main._load_events", lambda start, end, settings: fake_events)
+    monkeypatch.setattr("app.main._load_events", lambda start, end, settings, user_email="": fake_events)
     resp = c.get("/api/timesheet/daily?start=2026-06-01&end=2026-06-02")
     assert resp.status_code == 200
     body = resp.json()
@@ -260,7 +266,7 @@ def test_already_logged_from_odoo_existing_entry(client, monkeypatch):
         end=datetime(2026, 6, 1, 9, 30, tzinfo=tz),
         hours=0.5, date=Date(2026, 6, 1),
     )
-    monkeypatch.setattr("app.main._load_events", lambda start, end, settings: [ev])
+    monkeypatch.setattr("app.main._load_events", lambda start, end, settings, user_email="": [ev])
     fake_odoo.existing_entries.return_value = [{
         "contract_id": 10,
         "start_time": "2026-06-01 09:00:00",
@@ -282,7 +288,7 @@ def test_proposals_tolerate_odoo_failure(client, monkeypatch):
         end=datetime(2026, 6, 1, 9, 30, tzinfo=tz),
         hours=0.5, date=Date(2026, 6, 1),
     )
-    monkeypatch.setattr("app.main._load_events", lambda start, end, settings: [ev])
+    monkeypatch.setattr("app.main._load_events", lambda start, end, settings, user_email="": [ev])
     fake_odoo.existing_entries.side_effect = RuntimeError("session gone")
 
     resp = c.get("/api/calendar/events?start=2026-06-01&end=2026-06-01")
@@ -323,3 +329,42 @@ def test_colors_put_multiple_projects(client):
     body = resp.json()
     assert body["101"] == "#3B82F6"
     assert body["102"] == "#D97706"
+
+
+# ---------------------------------------------------------------------------
+# Ignore-keyword tests
+# ---------------------------------------------------------------------------
+
+def test_ignore_get_empty_initially(client):
+    c, _, _ = client
+    resp = c.get("/api/ignore")
+    assert resp.status_code == 200
+    assert resp.json() == []
+
+
+def test_ignore_put_normalizes_and_returns_keywords(client):
+    c, _, _ = client
+    resp = c.put("/api/ignore", json={"keywords": ["lunch", " OOO "]})
+    assert resp.status_code == 200
+    assert resp.json() == ["lunch", "OOO"]
+
+
+def test_ignore_get_reflects_put(client):
+    c, _, _ = client
+    c.put("/api/ignore", json={"keywords": ["lunch", "OOO"]})
+    resp = c.get("/api/ignore")
+    assert resp.status_code == 200
+    assert resp.json() == ["lunch", "OOO"]
+
+
+def test_demo_ignore_filters_team_lunch_event(demo_client):
+    c, _, _ = demo_client
+    # Set "lunch" as an ignore keyword.
+    put_resp = c.put("/api/ignore", json={"keywords": ["lunch"]})
+    assert put_resp.status_code == 200
+
+    resp = c.get("/api/calendar/events?start=2026-06-08&end=2026-06-12")
+    assert resp.status_code == 200
+    titles = [entry["event"]["title"] for entry in resp.json()]
+    # "Team lunch" should be filtered out.
+    assert not any("lunch" in t.lower() for t in titles)
