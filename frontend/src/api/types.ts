@@ -11,10 +11,8 @@ export interface CalendarEvent {
 
 export interface MatchResult {
   rule_id: number | null;
-  project_id: number | null;
-  project_name: string | null;
-  task_id: number | null;
-  task_name: string | null;
+  contract_id: number | null;
+  contract_name: string | null;
   alternative_rule_ids: number[];
 }
 
@@ -29,10 +27,8 @@ export interface Rule {
   id: number;
   name: string;
   keywords: string[];
-  project_id: number;
-  project_name: string;
-  task_id: number | null;
-  task_name: string | null;
+  contract_id: number;
+  contract_name: string;
   priority: number;
   active: boolean;
 }
@@ -42,25 +38,21 @@ export type RuleCreate = Omit<Rule, "id">;
 export interface PushEntry {
   uid: string;
   start: string;
-  date: string;
-  hours: number;
+  end: string;
   description: string;
-  project_id: number;
-  task_id: number | null;
+  contract_id: number;
 }
 
 export interface PushResult {
   uid: string;
   start: string;
   success: boolean;
-  odoo_line_id: number | null;
+  odoo_id: number | null;
   error: string | null;
 }
 
 export interface ContractTotal {
-  project_id: number;
-  project_name: string;
-  task_id: number | null;
-  task_name: string | null;
+  contract_id: number;
+  contract_name: string;
   hours: number;
 }

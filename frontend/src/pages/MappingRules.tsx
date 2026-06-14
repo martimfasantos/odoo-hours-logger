@@ -10,10 +10,8 @@ import Spinner from "../components/Spinner";
 interface FormState {
   name: string;
   keywords: string;
-  project_id: number | null;
-  project_name: string;
-  task_id: number | null;
-  task_name: string;
+  contract_id: number | null;
+  contract_name: string;
   priority: number;
   active: boolean;
 }
@@ -21,16 +19,14 @@ interface FormState {
 interface FormErrors {
   name?: string;
   keywords?: string;
-  project_id?: string;
+  contract_id?: string;
 }
 
 const EMPTY_FORM: FormState = {
   name: "",
   keywords: "",
-  project_id: null,
-  project_name: "",
-  task_id: null,
-  task_name: "",
+  contract_id: null,
+  contract_name: "",
   priority: 100,
   active: true,
 };
@@ -39,10 +35,8 @@ export default function MappingRules() {
   const toast = useToast();
 
   const [rules, setRules] = useState<Rule[]>([]);
-  const [projects, setProjects] = useState<OdooRef[]>([]);
-  const [tasks, setTasks] = useState<OdooRef[]>([]);
+  const [contracts, setContracts] = useState<OdooRef[]>([]);
   const [loadingRules, setLoadingRules] = useState(false);
-  const [loadingTasks, setLoadingTasks] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [deletingId, setDeletingId] = useState<number | null>(null);
 
@@ -53,9 +47,9 @@ export default function MappingRules() {
   useEffect(() => {
     fetchRules();
     api
-      .projects()
-      .then(setProjects)
-      .catch((e) => toast.error(`Failed to load projects: ${String(e)}`));
+      .contracts()
+      .then(setContracts)
+      .catch((e) => toast.error(`Failed to load contracts: ${String(e)}`));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -71,38 +65,12 @@ export default function MappingRules() {
     }
   }
 
-  async function loadTasks(projectId: number) {
-    setLoadingTasks(true);
-    setTasks([]);
-    try {
-      const data = await api.tasks(projectId);
-      setTasks(data);
-    } catch (e) {
-      toast.error(`Failed to load tasks: ${String(e)}`);
-    } finally {
-      setLoadingTasks(false);
-    }
-  }
-
-  function handleProjectChange(value: string) {
-    const proj = projects.find((p) => p.id === Number(value));
+  function handleContractChange(value: string) {
+    const contract = contracts.find((c) => c.id === Number(value));
     setForm((f) => ({
       ...f,
-      project_id: proj ? proj.id : null,
-      project_name: proj ? proj.name : "",
-      task_id: null,
-      task_name: "",
-    }));
-    setTasks([]);
-    if (proj) loadTasks(proj.id);
-  }
-
-  function handleTaskChange(value: string) {
-    const task = tasks.find((t) => t.id === Number(value));
-    setForm((f) => ({
-      ...f,
-      task_id: task ? task.id : null,
-      task_name: task ? task.name : "",
+      contract_id: contract ? contract.id : null,
+      contract_name: contract ? contract.name : "",
     }));
   }
 
@@ -114,7 +82,7 @@ export default function MappingRules() {
       .map((k) => k.trim())
       .filter(Boolean);
     if (kws.length === 0) errs.keywords = "At least one keyword is required.";
-    if (!form.project_id) errs.project_id = "A project is required.";
+    if (!form.contract_id) errs.contract_id = "A contract is required.";
     setErrors(errs);
     return Object.keys(errs).length === 0;
   }
@@ -127,10 +95,8 @@ export default function MappingRules() {
     return {
       name: form.name.trim(),
       keywords: kws,
-      project_id: form.project_id!,
-      project_name: form.project_name,
-      task_id: form.task_id,
-      task_name: form.task_name || null,
+      contract_id: form.contract_id!,
+      contract_name: form.contract_name,
       priority: form.priority,
       active: form.active,
     };
@@ -163,15 +129,11 @@ export default function MappingRules() {
     setForm({
       name: rule.name,
       keywords: rule.keywords.join(", "),
-      project_id: rule.project_id,
-      project_name: rule.project_name,
-      task_id: rule.task_id,
-      task_name: rule.task_name ?? "",
+      contract_id: rule.contract_id,
+      contract_name: rule.contract_name,
       priority: rule.priority,
       active: rule.active,
     });
-    setTasks([]);
-    if (rule.project_id) loadTasks(rule.project_id);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
@@ -179,7 +141,6 @@ export default function MappingRules() {
     setEditId(null);
     setForm(EMPTY_FORM);
     setErrors({});
-    setTasks([]);
   }
 
   async function handleDelete(id: number) {
@@ -202,7 +163,7 @@ export default function MappingRules() {
         <div>
           <h1 className="page__title">Mapping rules</h1>
           <p className="page__subtitle">
-            Keywords matched against calendar events to suggest Odoo projects and tasks.
+            Keywords matched against calendar events to suggest an Odoo contract.
           </p>
         </div>
       </header>
@@ -269,52 +230,28 @@ export default function MappingRules() {
                 )}
               </div>
 
-              {/* Project */}
-              <div className="field">
-                <label className="field__label" htmlFor="rule-project">
-                  Project
+              {/* Contract */}
+              <div className="field field--full">
+                <label className="field__label" htmlFor="rule-contract">
+                  Contract
                 </label>
                 <select
-                  id="rule-project"
-                  className={`select${errors.project_id ? " select--invalid" : ""}`}
-                  value={form.project_id ?? ""}
-                  onChange={(e) => handleProjectChange(e.target.value)}
+                  id="rule-contract"
+                  className={`select${errors.contract_id ? " select--invalid" : ""}`}
+                  title="Contract"
+                  aria-label="Contract"
+                  value={form.contract_id ?? ""}
+                  onChange={(e) => handleContractChange(e.target.value)}
                 >
-                  <option value="">— Select project —</option>
-                  {projects.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name}
+                  <option value="">— Select contract —</option>
+                  {contracts.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
                     </option>
                   ))}
                 </select>
-                {errors.project_id && (
-                  <span className="field__error">{errors.project_id}</span>
-                )}
-              </div>
-
-              {/* Task */}
-              <div className="field">
-                <label className="field__label" htmlFor="rule-task">
-                  Task <span style={{ fontWeight: 400 }}>(optional)</span>
-                </label>
-                <select
-                  id="rule-task"
-                  className="select"
-                  value={form.task_id ?? ""}
-                  disabled={!form.project_id || loadingTasks}
-                  onChange={(e) => handleTaskChange(e.target.value)}
-                >
-                  <option value="">— No task —</option>
-                  {tasks.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.name}
-                    </option>
-                  ))}
-                </select>
-                {loadingTasks && (
-                  <span className="muted" style={{ fontSize: "0.8rem", marginTop: 2 }}>
-                    Loading tasks…
-                  </span>
+                {errors.contract_id && (
+                  <span className="field__error">{errors.contract_id}</span>
                 )}
               </div>
 
@@ -393,8 +330,7 @@ export default function MappingRules() {
                 <tr>
                   <th>Name</th>
                   <th>Keywords</th>
-                  <th>Project</th>
-                  <th>Task</th>
+                  <th>Contract</th>
                   <th className="num" style={{ width: 80 }}>Priority</th>
                   <th style={{ width: 90 }}>Status</th>
                   <th style={{ width: 120 }}>Actions</th>
@@ -411,8 +347,7 @@ export default function MappingRules() {
                         ))}
                       </div>
                     </td>
-                    <td>{rule.project_name}</td>
-                    <td className="muted">{rule.task_name ?? "—"}</td>
+                    <td>{rule.contract_name}</td>
                     <td className="num">{rule.priority}</td>
                     <td>
                       <Badge variant={rule.active ? "active" : "inactive"}>

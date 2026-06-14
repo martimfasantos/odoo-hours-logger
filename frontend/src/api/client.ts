@@ -16,8 +16,8 @@ async function req<T>(url: string, options?: RequestInit): Promise<T> {
 
 export const api = {
   health: () => req<{ status: string }>("/api/health"),
-  projects: () => req<OdooRef[]>("/api/odoo/projects"),
-  tasks: (projectId: number) => req<OdooRef[]>(`/api/odoo/projects/${projectId}/tasks`),
+  contracts: (query = "") =>
+    req<OdooRef[]>(`/api/odoo/contracts?query=${encodeURIComponent(query)}`),
   events: (start: string, end: string) =>
     req<ProposedEntry[]>(`/api/calendar/events?start=${start}&end=${end}`),
   daily: (start: string, end: string) =>
@@ -36,8 +36,8 @@ export const api = {
       method: "POST", body: JSON.stringify({ entries }),
     }),
   getColors: () => req<Record<string, string>>("/api/colors"),
-  setColor: (projectId: number, color: string) =>
-    req<Record<string, string>>(`/api/colors/${projectId}`, {
+  setColor: (contractId: number, color: string) =>
+    req<Record<string, string>>(`/api/colors/${contractId}`, {
       method: "PUT", body: JSON.stringify({ color }),
     }),
   testConnection: () =>

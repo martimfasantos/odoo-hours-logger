@@ -1,4 +1,4 @@
-/** Distinct, accessible palette used to color projects deterministically. */
+/** Distinct, accessible palette used to color contracts deterministically. */
 export const PALETTE: string[] = [
   "#3B82F6",
   "#D97706",
@@ -12,21 +12,21 @@ export const PALETTE: string[] = [
   "#0D9488",
 ];
 
-/** Neutral gray for events without a resolved project. */
+/** Neutral gray for events without a resolved contract. */
 export const UNASSIGNED_COLOR = "#94A3B8";
 
 /**
- * Resolve a display color for a project.
- * - `null` projectId -> the neutral unassigned gray.
- * - A stored override (`stored[String(projectId)]`) wins if present.
- * - Otherwise a deterministic palette color keyed off the projectId.
+ * Resolve a display color for a contract.
+ * - `null` contractId -> the neutral unassigned gray.
+ * - A stored override (`stored[String(contractId)]`) wins if present.
+ * - Otherwise a deterministic palette color keyed off the contractId.
  */
-export function colorForProject(
-  projectId: number | null,
+export function colorForContract(
+  contractId: number | null,
   stored: Record<string, string>,
 ): string {
-  if (projectId == null) return UNASSIGNED_COLOR;
-  const override = stored[String(projectId)];
+  if (contractId == null) return UNASSIGNED_COLOR;
+  const override = stored[String(contractId)];
   if (override) return override;
-  return PALETTE[Math.abs(projectId) % PALETTE.length];
+  return PALETTE[Math.abs(contractId) % PALETTE.length];
 }

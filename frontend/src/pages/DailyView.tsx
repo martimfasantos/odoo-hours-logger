@@ -22,8 +22,7 @@ import {
 } from "../lib/dates";
 
 interface RowState {
-  projectId: number | null;
-  taskId: number | null;
+  contractId: number | null;
   approved: boolean;
   description: string;
 }
@@ -109,10 +108,7 @@ export default function DailyView() {
   );
 
   const [proposals, setProposals] = useState<ProposedEntry[]>([]);
-  const [projects, setProjects] = useState<OdooRef[]>([]);
-  const [tasksByProject, setTasksByProject] = useState<
-    Record<number, OdooRef[]>
-  >({});
+  const [contracts, setContracts] = useState<OdooRef[]>([]);
   const [rows, setRows] = useState<Record<string, RowState>>({});
   const [results, setResults] = useState<Record<string, PushResult>>({});
   const [colors, setColors] = useState<Record<string, string>>({});
@@ -122,16 +118,16 @@ export default function DailyView() {
   const [pushing, setPushing] = useState(false);
   const [hasFetched, setHasFetched] = useState(false);
 
-  // Load projects once for the dropdowns.
+  // Load contracts once for the dropdowns.
   useEffect(() => {
     api
-      .projects()
-      .then(setProjects)
-      .catch((e) => toast.error(`Failed to load projects: ${String(e)}`));
+      .contracts()
+      .then(setContracts)
+      .catch((e) => toast.error(`Failed to load contracts: ${String(e)}`));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Load stored project colors once (tolerate failure).
+  // Load stored contract colors once (tolerate failure).
   useEffect(() => {
     api
       .getColors()
@@ -139,13 +135,13 @@ export default function DailyView() {
       .catch(() => setColors({}));
   }, []);
 
-  // Optimistically recolor a project, persisting via the API.
-  async function handleSetColor(projectId: number, hex: string) {
-    const key = String(projectId);
+  // Optimistically recolor a contract, persisting via the API.
+  async function handleSetColor(contractId: number, hex: string) {
+    const key = String(contractId);
     const prev = colors[key];
     setColors((c) => ({ ...c, [key]: hex }));
     try {
-      const updated = await api.setColor(projectId, hex);
+      const updated = await api.setColor(contractId, hex);
       setColors(updated);
     } catch (e) {
       // Revert on failure.
@@ -156,16 +152,6 @@ export default function DailyView() {
         return next;
       });
       toast.error(`Failed to save color: ${String(e)}`);
-    }
-  }
-
-  async function loadTasks(projectId: number) {
-    if (tasksByProject[projectId]) return;
-    try {
-      const t = await api.tasks(projectId);
-      setTasksByProject((prev) => ({ ...prev, [projectId]: t }));
-    } catch (e) {
-      toast.error(`Failed to load tasks: ${String(e)}`);
     }
   }
 
@@ -184,18 +170,14 @@ export default function DailyView() {
       setHasFetched(true);
       setCalendarWeekStart(rangeStart);
       const init: Record<string, RowState> = {};
-      const projectIds = new Set<number>();
       for (const p of data) {
         init[rowKey(p)] = {
-          projectId: p.match.project_id,
-          taskId: p.match.task_id,
+          contractId: p.match.contract_id,
           approved: !p.already_logged,
           description: p.event.title,
         };
-        if (p.match.project_id) projectIds.add(p.match.project_id);
       }
       setRows(init);
-      for (const id of projectIds) loadTasks(id);
     } catch (e) {
       toast.error(`Failed to fetch calendar: ${String(e)}`);
     } finally {
@@ -220,10 +202,9 @@ export default function DailyView() {
     setRows((prev) => ({ ...prev, [key]: { ...prev[key], ...patch } }));
   }
 
-  function onProjectChange(p: ProposedEntry, value: string) {
-    const projectId = value ? Number(value) : null;
-    setRow(rowKey(p), { projectId, taskId: null });
-    if (projectId) loadTasks(projectId);
+  function onContractChange(p: ProposedEntry, value: string) {
+    const contractId = value ? Number(value) : null;
+    setRow(rowKey(p), { contractId });
   }
 
   const approvedEntries: PushEntry[] = useMemo(
@@ -231,7 +212,7 @@ export default function DailyView() {
       proposals
         .filter((p) => {
           const r = rows[rowKey(p)];
-          return r?.approved && r?.projectId && !p.already_logged;
+          return r?.approved && r?.contractId && !p.already_logged;
         })
         .map((p) => {
           const r = rows[rowKey(p)]!;
@@ -239,11 +220,9 @@ export default function DailyView() {
           return {
             uid: p.event.uid,
             start: p.event.start,
-            date: p.event.date,
-            hours: p.event.hours,
+            end: p.event.end,
             description: desc || p.event.title,
-            project_id: r.projectId!,
-            task_id: r.taskId,
+            contract_id: r.contractId!,
           };
         }),
     [proposals, rows],
@@ -324,7 +303,7 @@ export default function DailyView() {
         <div>
           <h1 className="page__title">Daily hours</h1>
           <p className="page__subtitle">
-            Review calendar events, map them to Odoo projects, and push approved
+            Review calendar events, map them to Odoo contracts, and push approved
             entries.
           </p>
         </div>
@@ -427,7 +406,7 @@ export default function DailyView() {
         <DailyCalendar
           proposals={proposals}
           rows={rows}
-          projects={projects}
+          contracts={contracts}
           weekStartISO={calendarWeekStart}
           colors={colors}
           onSetColor={handleSetColor}
@@ -531,8 +510,7 @@ export default function DailyView() {
                             <th className="num" style={{ width: 72 }}>
                               Hours
                             </th>
-                            <th style={{ width: 200 }}>Project</th>
-                            <th style={{ width: 200 }}>Task</th>
+                            <th style={{ width: 260 }}>Contract</th>
                             <th>Description</th>
                             <th style={{ width: 150 }}>Status</th>
                             <th style={{ width: 90 }} className="text-right">
@@ -545,9 +523,6 @@ export default function DailyView() {
                             const key = rowKey(p);
                             const r = rows[key];
                             const result = results[key];
-                            const tasks = r?.projectId
-                              ? (tasksByProject[r.projectId] ?? [])
-                              : [];
                             const rowClass = p.already_logged
                               ? "row--logged"
                               : result && !result.success
@@ -565,39 +540,18 @@ export default function DailyView() {
                                 <td>
                                   <select
                                     className="select select--cell"
-                                    aria-label={`Project for ${p.event.title}`}
-                                    value={r?.projectId ?? ""}
+                                    title={`Contract for ${p.event.title}`}
+                                    aria-label={`Contract for ${p.event.title}`}
+                                    value={r?.contractId ?? ""}
                                     disabled={p.already_logged}
                                     onChange={(e) =>
-                                      onProjectChange(p, e.target.value)
+                                      onContractChange(p, e.target.value)
                                     }
                                   >
-                                    <option value="">— Select project —</option>
-                                    {projects.map((proj) => (
-                                      <option key={proj.id} value={proj.id}>
-                                        {proj.name}
-                                      </option>
-                                    ))}
-                                  </select>
-                                </td>
-                                <td>
-                                  <select
-                                    className="select select--cell"
-                                    aria-label={`Task for ${p.event.title}`}
-                                    value={r?.taskId ?? ""}
-                                    disabled={p.already_logged || !r?.projectId}
-                                    onChange={(e) =>
-                                      setRow(key, {
-                                        taskId: e.target.value
-                                          ? Number(e.target.value)
-                                          : null,
-                                      })
-                                    }
-                                  >
-                                    <option value="">— No task —</option>
-                                    {tasks.map((t) => (
-                                      <option key={t.id} value={t.id}>
-                                        {t.name}
+                                    <option value="">— Select contract —</option>
+                                    {contracts.map((c) => (
+                                      <option key={c.id} value={c.id}>
+                                        {c.name}
                                       </option>
                                     ))}
                                   </select>

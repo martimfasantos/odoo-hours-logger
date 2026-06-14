@@ -10,11 +10,10 @@ import {
   formatTime,
   formatWeekRange,
 } from "../lib/dates";
-import { colorForProject, UNASSIGNED_COLOR } from "../lib/colors";
+import { colorForContract, UNASSIGNED_COLOR } from "../lib/colors";
 
 interface RowState {
-  projectId: number | null;
-  taskId: number | null;
+  contractId: number | null;
   approved: boolean;
   description: string;
 }
@@ -22,10 +21,10 @@ interface RowState {
 interface DailyCalendarProps {
   proposals: ProposedEntry[];
   rows: Record<string, RowState>;
-  projects: OdooRef[];
+  contracts: OdooRef[];
   weekStartISO: string; // Monday of the week to show (YYYY-MM-DD)
   colors: Record<string, string>;
-  onSetColor: (projectId: number, color: string) => void;
+  onSetColor: (contractId: number, color: string) => void;
   onPrevWeek: () => void;
   onNextWeek: () => void;
 }
@@ -37,11 +36,11 @@ const DEFAULT_END = 19;
 
 const rowKey = (p: ProposedEntry) => `${p.event.uid}|${p.event.start}`;
 
-/** A proposal enriched with its resolved project + display color + geometry. */
+/** A proposal enriched with its resolved contract + display color + geometry. */
 interface ResolvedEvent {
   proposal: ProposedEntry;
   pid: number | null;
-  projectName: string;
+  contractName: string;
   color: string;
   startHour: number; // decimal hour-of-day
   endHour: number; // decimal hour-of-day
@@ -57,18 +56,18 @@ interface LaidOut extends ResolvedEvent {
 export default function DailyCalendar({
   proposals,
   rows,
-  projects,
+  contracts,
   weekStartISO,
   colors,
   onSetColor,
   onPrevWeek,
   onNextWeek,
 }: DailyCalendarProps) {
-  const projectNameById = useMemo(() => {
+  const contractNameById = useMemo(() => {
     const m = new Map<number, string>();
-    for (const p of projects) m.set(p.id, p.name);
+    for (const c of contracts) m.set(c.id, c.name);
     return m;
-  }, [projects]);
+  }, [contracts]);
 
   // The 7 day dates Mon..Sun.
   const dayDates = useMemo(
@@ -76,29 +75,31 @@ export default function DailyCalendar({
     [weekStartISO],
   );
 
-  // Resolve every proposal's project, name, color and time geometry.
+  // Resolve every proposal's contract, name, color and time geometry.
   const resolved = useMemo<ResolvedEvent[]>(() => {
     return proposals.map((p) => {
       const pid =
-        rows[rowKey(p)]?.projectId ?? p.match.project_id ?? null;
-      let projectName = "Unassigned";
+        rows[rowKey(p)]?.contractId ?? p.match.contract_id ?? null;
+      let contractName = "Unassigned";
       if (pid != null) {
-        projectName =
-          projectNameById.get(pid) ?? p.match.project_name ?? `Project ${pid}`;
+        contractName =
+          contractNameById.get(pid) ??
+          p.match.contract_name ??
+          `Contract ${pid}`;
       }
       const startHour = decimalHour(p.event.start);
       const hours = p.event.hours;
       return {
         proposal: p,
         pid,
-        projectName,
-        color: colorForProject(pid, colors),
+        contractName,
+        color: colorForContract(pid, colors),
         startHour,
         endHour: startHour + hours,
         hours,
       };
     });
-  }, [proposals, rows, colors, projectNameById]);
+  }, [proposals, rows, colors, contractNameById]);
 
   // Group resolved events by their local date string.
   const byDate = useMemo(() => {
@@ -148,14 +149,14 @@ export default function DailyCalendar({
     [dayTotals],
   );
 
-  // Distinct projects present in the week (for the legend).
+  // Distinct contracts present in the week (for the legend).
   const legend = useMemo(() => {
     const seen = new Map<string, { pid: number | null; name: string }>();
     for (const ev of resolved) {
       const k = ev.pid == null ? "unassigned" : String(ev.pid);
-      if (!seen.has(k)) seen.set(k, { pid: ev.pid, name: ev.projectName });
+      if (!seen.has(k)) seen.set(k, { pid: ev.pid, name: ev.contractName });
     }
-    // Real projects first (alphabetical), then Unassigned last.
+    // Real contracts first (alphabetical), then Unassigned last.
     return [...seen.values()].sort((a, b) => {
       if (a.pid == null) return 1;
       if (b.pid == null) return -1;
@@ -249,7 +250,7 @@ export default function DailyCalendar({
                   const height = Math.max(ev.hours * HOUR_PX, MIN_BLOCK_PX);
                   const widthPct = 100 / ev.clusterCols;
                   const isLogged = ev.proposal.already_logged;
-                  const fullText = `${formatTime(ev.proposal.event.start)} ${ev.proposal.event.title} — ${formatHours(ev.hours)} (${ev.projectName})${isLogged ? " — logged" : ""}`;
+                  const fullText = `${formatTime(ev.proposal.event.start)} ${ev.proposal.event.title} — ${formatHours(ev.hours)} (${ev.contractName})${isLogged ? " — logged" : ""}`;
                   return (
                     <div
                       key={rowKey(ev.proposal)}
@@ -285,7 +286,7 @@ export default function DailyCalendar({
       </div>
 
       {/* Color legend */}
-      <div className="cal-legend" aria-label="Project colors">
+      <div className="cal-legend" aria-label="Contract colors">
         {legend.map((item) => {
           if (item.pid == null) {
             return (
@@ -300,7 +301,7 @@ export default function DailyCalendar({
             );
           }
           const pid = item.pid;
-          const value = colorForProject(pid, colors);
+          const value = colorForContract(pid, colors);
           const inputId = `cal-color-${pid}`;
           return (
             <label className="cal-legend-item" key={pid} htmlFor={inputId}>

@@ -16,10 +16,10 @@ const ENV_VARS = [
   "GOOGLE_CALENDAR_URL",
   "ODOO_URL",
   "ODOO_DB",
-  "ODOO_USERNAME",
-  "ODOO_API_KEY",
+  "ODOO_SESSION_ID",
   "LOCAL_TZ",
   "USER_EMAIL",
+  "DEMO_MODE",
 ];
 
 export default function Settings() {
@@ -148,6 +148,12 @@ export default function Settings() {
                   </li>
                 ))}
               </ul>
+              <p style={{ margin: "8px 0 0 0" }}>
+                Note: <code style={{ fontFamily: "var(--font-mono)", fontSize: "0.85em", background: "var(--color-muted)", padding: "1px 6px", borderRadius: "var(--radius-sm)", border: "1px solid var(--color-border)" }}>ODOO_SESSION_ID</code>{" "}
+                expires periodically — when it does, re-copy a fresh{" "}
+                <code style={{ fontFamily: "var(--font-mono)", fontSize: "0.85em", background: "var(--color-muted)", padding: "1px 6px", borderRadius: "var(--radius-sm)", border: "1px solid var(--color-border)" }}>session_id</code>{" "}
+                from the browser.
+              </p>
             </div>
           </div>
         </div>

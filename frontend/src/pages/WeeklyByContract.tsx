@@ -5,7 +5,7 @@ import type { ContractTotal } from "../api/types";
 import { useToast } from "../components/Toast";
 import Spinner from "../components/Spinner";
 import { startOfWeek, addDays, formatHours } from "../lib/dates";
-import { colorForProject } from "../lib/colors";
+import { colorForContract } from "../lib/colors";
 
 export default function WeeklyByContract() {
   const toast = useToast();
@@ -72,7 +72,7 @@ export default function WeeklyByContract() {
         <div>
           <h1 className="page__title">Weekly by contract</h1>
           <p className="page__subtitle">
-            Hours logged to Odoo grouped by project and task for a given week.
+            Hours logged to Odoo grouped by contract for a given week.
           </p>
         </div>
       </header>
@@ -142,15 +142,13 @@ export default function WeeklyByContract() {
               </span>
             </div>
             <div className="card__pad">
-              <div className="bars" role="img" aria-label="Horizontal bar chart of hours by project">
+              <div className="bars" role="img" aria-label="Horizontal bar chart of hours by contract">
                 {sorted.map((row, i) => {
                   const pct = maxHours > 0 ? (row.hours / maxHours) * 100 : 0;
-                  const label = row.task_name
-                    ? `${row.project_name} / ${row.task_name}`
-                    : row.project_name;
+                  const label = row.contract_name;
                   return (
                     <div
-                      key={`${row.project_id}-${row.task_id ?? "none"}-${i}`}
+                      key={`${row.contract_id}-${i}`}
                       className="bar-row"
                       aria-label={`${label}: ${formatHours(row.hours)}`}
                     >
@@ -162,7 +160,7 @@ export default function WeeklyByContract() {
                           className="bar-row__fill"
                           style={{
                             width: `${pct}%`,
-                            background: colorForProject(row.project_id, colors),
+                            background: colorForContract(row.contract_id, colors),
                           }}
                         />
                         <span
@@ -188,23 +186,21 @@ export default function WeeklyByContract() {
               <table className="table">
                 <thead>
                   <tr>
-                    <th>Project</th>
-                    <th>Task</th>
+                    <th>Contract</th>
                     <th className="num" style={{ width: 90 }}>Hours</th>
                   </tr>
                 </thead>
                 <tbody>
                   {sorted.map((row, i) => (
-                    <tr key={`${row.project_id}-${row.task_id ?? "none"}-${i}`}>
-                      <td>{row.project_name}</td>
-                      <td className="muted">{row.task_name ?? "—"}</td>
+                    <tr key={`${row.contract_id}-${i}`}>
+                      <td>{row.contract_name}</td>
                       <td className="num">{formatHours(row.hours)}</td>
                     </tr>
                   ))}
                 </tbody>
                 <tfoot>
                   <tr>
-                    <td colSpan={2}>Total</td>
+                    <td>Total</td>
                     <td className="num">{formatHours(grandTotal)}</td>
                   </tr>
                 </tfoot>
