@@ -43,4 +43,7 @@ export const api = {
   testConnection: () =>
     req<{ odoo: boolean; calendar: boolean; errors: Record<string, string> }>(
       "/api/settings/test-connection", { method: "POST" }),
+  getIgnoreKeywords: () => req<string[]>("/api/ignore"),
+  setIgnoreKeywords: (keywords: string[]) =>
+    req<string[]>("/api/ignore", { method: "PUT", body: JSON.stringify({ keywords }) }),
 };

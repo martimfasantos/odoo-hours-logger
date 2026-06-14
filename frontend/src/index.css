@@ -1148,6 +1148,76 @@ a {
 }
 
 /* ============================================================
+   Filter words (MappingRules ignore-keywords editor)
+   ============================================================ */
+.filter-words__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  background: var(--color-muted);
+  color: var(--color-fg);
+  padding: 3px var(--space-1) 3px var(--space-2);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+}
+
+.filter-chip__label {
+  line-height: 1;
+}
+
+.filter-chip__remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: background var(--transition), color var(--transition);
+  flex: none;
+}
+.filter-chip__remove:hover:not(:disabled) {
+  background: var(--color-danger);
+  color: var(--color-on-primary);
+}
+.filter-chip__remove:focus-visible {
+  outline: 2px solid var(--color-ring);
+  outline-offset: 2px;
+}
+.filter-chip__remove:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.filter-words__add {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  max-width: 400px;
+}
+
+.filter-words__row {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+}
+.filter-words__row .input {
+  flex: 1;
+}
+
+/* ============================================================
    Toasts
    ============================================================ */
 .toast-stack {

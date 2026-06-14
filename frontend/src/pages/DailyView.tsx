@@ -156,10 +156,10 @@ export default function DailyView() {
   }
 
   async function refresh() {
-    const rangeStart = startOfWeek(new Date(`${fromDate}T00:00:00`));
-    const rangeEnd = addDays(startOfWeek(new Date(`${toDate}T00:00:00`)), 6);
+    const rangeStart = fromDate;
+    const rangeEnd = toDate;
     if (rangeStart > rangeEnd) {
-      toast.error("\"From week\" must be on or before \"To week\".");
+      toast.error("\"From\" must be on or before \"To\".");
       return;
     }
     setLoading(true);
@@ -168,7 +168,7 @@ export default function DailyView() {
       const data = await api.events(rangeStart, rangeEnd);
       setProposals(data);
       setHasFetched(true);
-      setCalendarWeekStart(rangeStart);
+      setCalendarWeekStart(startOfWeek(new Date(`${fromDate}T00:00:00`)));
       const init: Record<string, RowState> = {};
       for (const p of data) {
         init[rowKey(p)] = {
@@ -338,7 +338,7 @@ export default function DailyView() {
           <div className="toolbar">
             <div className="field">
               <label className="field__label" htmlFor="daily-from">
-                From week
+                From
               </label>
               <input
                 id="daily-from"
@@ -347,11 +347,11 @@ export default function DailyView() {
                 value={fromDate}
                 onChange={(e) => setFromDate(e.target.value)}
               />
-              <span className="field__hint">(any day in the week)</span>
+              <span className="field__hint">(inclusive)</span>
             </div>
             <div className="field">
               <label className="field__label" htmlFor="daily-to">
-                To week
+                To
               </label>
               <input
                 id="daily-to"
@@ -360,7 +360,7 @@ export default function DailyView() {
                 value={toDate}
                 onChange={(e) => setToDate(e.target.value)}
               />
-              <span className="field__hint">(any day in the week)</span>
+              <span className="field__hint">(inclusive)</span>
             </div>
             <Button
               variant="primary"

@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { Plus, Pencil, Trash2 } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Plus, Pencil, Trash2, X } from "lucide-react";
 import { api } from "../api/client";
 import type { OdooRef, Rule, RuleCreate } from "../api/types";
 import { useToast } from "../components/Toast";
@@ -44,12 +44,22 @@ export default function MappingRules() {
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [errors, setErrors] = useState<FormErrors>({});
 
+  // Filter words state
+  const [ignoreKeywords, setIgnoreKeywords] = useState<string[]>([]);
+  const [newWord, setNewWord] = useState("");
+  const [savingIgnore, setSavingIgnore] = useState(false);
+  const newWordInputRef = useRef<HTMLInputElement>(null);
+
   useEffect(() => {
     fetchRules();
     api
       .contracts()
       .then(setContracts)
       .catch((e) => toast.error(`Failed to load contracts: ${String(e)}`));
+    api
+      .getIgnoreKeywords()
+      .then(setIgnoreKeywords)
+      .catch((e) => toast.error(`Failed to load filter words: ${String(e)}`));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -143,6 +153,42 @@ export default function MappingRules() {
     setErrors({});
   }
 
+  async function handleAddWord() {
+    const word = newWord.trim();
+    if (!word) return;
+    const alreadyPresent = ignoreKeywords.some(
+      (w) => w.toLowerCase() === word.toLowerCase(),
+    );
+    if (alreadyPresent) {
+      setNewWord("");
+      return;
+    }
+    setSavingIgnore(true);
+    try {
+      const saved = await api.setIgnoreKeywords([...ignoreKeywords, word]);
+      setIgnoreKeywords(saved);
+      setNewWord("");
+    } catch (e) {
+      toast.error(`Failed to save filter words: ${String(e)}`);
+    } finally {
+      setSavingIgnore(false);
+    }
+  }
+
+  async function handleRemoveWord(word: string) {
+    setSavingIgnore(true);
+    try {
+      const saved = await api.setIgnoreKeywords(
+        ignoreKeywords.filter((w) => w !== word),
+      );
+      setIgnoreKeywords(saved);
+    } catch (e) {
+      toast.error(`Failed to save filter words: ${String(e)}`);
+    } finally {
+      setSavingIgnore(false);
+    }
+  }
+
   async function handleDelete(id: number) {
     if (!window.confirm("Delete this rule? This cannot be undone.")) return;
     setDeletingId(id);
@@ -167,6 +213,73 @@ export default function MappingRules() {
           </p>
         </div>
       </header>
+
+      {/* Filter words card */}
+      <section className="card" aria-label="Filter words">
+        <div className="card__head">
+          <h3>Filter words</h3>
+          {savingIgnore && <Spinner />}
+        </div>
+        <div className="card__pad">
+          <p className="page__subtitle" style={{ marginBottom: "var(--space-4)" }}>
+            Calendar events whose title contains any of these words are skipped on
+            import (e.g. &ldquo;Out of Office&rdquo;, &ldquo;Lunch&rdquo;).
+          </p>
+
+          {ignoreKeywords.length > 0 && (
+            <div className="filter-words__chips" style={{ marginBottom: "var(--space-4)" }}>
+              {ignoreKeywords.map((word) => (
+                <span key={word} className="filter-chip">
+                  <span className="filter-chip__label">{word}</span>
+                  <button
+                    type="button"
+                    className="filter-chip__remove"
+                    aria-label={`Remove filter word "${word}"`}
+                    disabled={savingIgnore}
+                    onClick={() => handleRemoveWord(word)}
+                  >
+                    <X size={12} aria-hidden="true" />
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
+
+          <div className="filter-words__add">
+            <label className="field__label" htmlFor="filter-word-input">
+              Add a word
+            </label>
+            <div className="filter-words__row">
+              <input
+                id="filter-word-input"
+                ref={newWordInputRef}
+                type="text"
+                className="input"
+                value={newWord}
+                placeholder="e.g. Out of Office"
+                disabled={savingIgnore}
+                onChange={(e) => setNewWord(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    void handleAddWord();
+                  }
+                }}
+              />
+              <Button
+                variant="primary"
+                size="sm"
+                disabled={savingIgnore || !newWord.trim()}
+                loading={savingIgnore}
+                onClick={() => void handleAddWord()}
+              >
+                {!savingIgnore && <Plus size={14} aria-hidden="true" />}
+                Add
+              </Button>
+            </div>
+          </div>
+        </div>
+      </section>
 
       {/* Form card */}
       <section className="card" aria-label={editId !== null ? "Edit rule" : "Create rule"}>
