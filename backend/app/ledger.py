@@ -1,7 +1,6 @@
 import json
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
 
 
 def _key(uid: str, start: datetime) -> str:
@@ -30,17 +29,14 @@ class Ledger:
     def is_logged(self, uid: str, start: datetime) -> bool:
         return _key(uid, start) in self._keys()
 
-    def record(self, uid: str, start: datetime, odoo_line_id: int,
-               project_id: int, task_id: Optional[int], hours: float,
-               pushed_at: str) -> None:
+    def record(self, uid: str, start: datetime, odoo_id: int,
+               contract_id: int, pushed_at: str) -> None:
         items = self._load()
         items.append({
             "event_uid": uid,
             "event_start": start.isoformat(),
-            "odoo_line_id": odoo_line_id,
-            "project_id": project_id,
-            "task_id": task_id,
-            "hours": hours,
+            "odoo_id": odoo_id,
+            "contract_id": contract_id,
             "pushed_at": pushed_at,
         })
         self._save(items)

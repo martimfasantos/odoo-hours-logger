@@ -11,8 +11,15 @@ class Settings(BaseSettings):
     GOOGLE_CALENDAR_URL: str = ""
     ODOO_URL: str = ""
     ODOO_DB: str = ""
+    # Legacy XML-RPC credentials — kept so existing .env files still parse,
+    # but no longer used (auth is now via session cookie).
     ODOO_USERNAME: str = ""
     ODOO_API_KEY: str = ""
+    # Session-cookie auth (copy from a logged-in Odoo browser tab).
+    ODOO_SESSION_ID: str = ""
+    ODOO_VISITOR_UUID: str = ""
+    ODOO_USER_ID: int | None = None
+    ODOO_NETWORK_MEMBER_ID: int | None = None
     LOCAL_TZ: str = "Europe/Lisbon"
     USER_EMAIL: str = ""
     DATA_DIR: str = "data"

@@ -3,11 +3,10 @@ from app.matcher import match_title
 from app.schemas import Rule
 
 
-def _rule(id, name, keywords, project_id, priority=100, active=True, task_id=None):
+def _rule(id, name, keywords, contract_id, priority=100, active=True):
     return Rule(
-        id=id, name=name, keywords=keywords, project_id=project_id,
-        project_name=name, task_id=task_id, task_name=None,
-        priority=priority, active=active,
+        id=id, name=name, keywords=keywords, contract_id=contract_id,
+        contract_name=name, priority=priority, active=active,
     )
 
 
@@ -15,7 +14,8 @@ def test_single_keyword_match():
     rules = [_rule(1, "GreenVolt", ["greenvolt"], 10)]
     m = match_title("GreenVolt standup", rules)
     assert m.rule_id == 1
-    assert m.project_id == 10
+    assert m.contract_id == 10
+    assert m.contract_name == "GreenVolt"
 
 
 def test_match_is_case_insensitive():
@@ -44,4 +44,4 @@ def test_no_match_returns_empty_result():
     rules = [_rule(1, "GreenVolt", ["greenvolt"], 10)]
     m = match_title("Lunch", rules)
     assert m.rule_id is None
-    assert m.project_id is None
+    assert m.contract_id is None

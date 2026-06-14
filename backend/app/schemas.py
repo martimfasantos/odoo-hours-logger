@@ -18,10 +18,8 @@ class CalendarEvent(BaseModel):
 class RuleCreate(BaseModel):
     name: str
     keywords: list[str]
-    project_id: int
-    project_name: str
-    task_id: Optional[int] = None
-    task_name: Optional[str] = None
+    contract_id: int
+    contract_name: str
     priority: int = 100
     active: bool = True
 
@@ -32,10 +30,8 @@ class Rule(RuleCreate):
 
 class MatchResult(BaseModel):
     rule_id: Optional[int] = None
-    project_id: Optional[int] = None
-    project_name: Optional[str] = None
-    task_id: Optional[int] = None
-    task_name: Optional[str] = None
+    contract_id: Optional[int] = None
+    contract_name: Optional[str] = None
     alternative_rule_ids: list[int] = Field(default_factory=list)
 
 
@@ -49,18 +45,16 @@ class ProposedEntry(BaseModel):
 class PushEntry(BaseModel):
     uid: str
     start: datetime
-    date: Date
-    hours: float
+    end: datetime
     description: str
-    project_id: int
-    task_id: Optional[int] = None
+    contract_id: int
 
 
 class PushResult(BaseModel):
     uid: str
     start: datetime
     success: bool
-    odoo_line_id: Optional[int] = None
+    odoo_id: Optional[int] = None
     error: Optional[str] = None
 
 
@@ -68,12 +62,15 @@ class OdooRef(BaseModel):
     id: int
     name: str
 
+    @field_validator("name", mode="before")
+    @classmethod
+    def _coerce_name(cls, v):
+        return v or ""
+
 
 class ContractTotal(BaseModel):
-    project_id: int
-    project_name: str
-    task_id: Optional[int] = None
-    task_name: Optional[str] = None
+    contract_id: int
+    contract_name: str
     hours: float
 
 

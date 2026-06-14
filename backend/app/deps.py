@@ -30,4 +30,12 @@ def colors_store() -> ColorStore:
 @lru_cache
 def odoo() -> OdooClient:
     s = settings()
-    return OdooClient(s.ODOO_URL, s.ODOO_DB, s.ODOO_USERNAME, s.ODOO_API_KEY)
+    return OdooClient(
+        base_url=s.ODOO_URL,
+        session_id=s.ODOO_SESSION_ID,
+        local_tz=s.LOCAL_TZ,
+        db=s.ODOO_DB,
+        visitor_uuid=s.ODOO_VISITOR_UUID,
+        user_id=s.ODOO_USER_ID,
+        network_member_id=s.ODOO_NETWORK_MEMBER_ID,
+    )

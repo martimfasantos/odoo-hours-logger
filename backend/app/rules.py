@@ -21,7 +21,15 @@ class RulesStore:
         self.path.write_text(json.dumps(items, indent=2, default=str))
 
     def list(self) -> list[Rule]:
-        return [Rule(**item) for item in self._load_raw()]
+        rules: list[Rule] = []
+        for item in self._load_raw():
+            try:
+                rules.append(Rule(**item))
+            except (TypeError, ValueError):
+                # Skip stale/old-shaped records so a legacy rules.json
+                # doesn't crash the whole listing.
+                continue
+        return rules
 
     def create(self, data: RuleCreate) -> Rule:
         items = self._load_raw()

@@ -4,17 +4,11 @@ from zoneinfo import ZoneInfo
 
 from app.schemas import CalendarEvent, OdooRef
 
-DEMO_PROJECTS: list[OdooRef] = [
-    OdooRef(id=101, name="GreenVolt"),
-    OdooRef(id=102, name="Lisport"),
-    OdooRef(id=103, name="Internal"),
+DEMO_CONTRACTS: list[OdooRef] = [
+    OdooRef(id=9001, name="[9001] Demo Client A"),
+    OdooRef(id=9002, name="[9002] Demo Client B"),
+    OdooRef(id=9003, name="[9003] Internal"),
 ]
-
-DEMO_TASKS: dict[int, list[OdooRef]] = {
-    101: [OdooRef(id=1001, name="Meetings"), OdooRef(id=1002, name="Development")],
-    102: [OdooRef(id=1003, name="Workshops"), OdooRef(id=1004, name="Support")],
-    103: [OdooRef(id=1005, name="Admin")],
-}
 
 # Template: (uid, title, day_offset, hour_start, hour_end)
 # demo-1 and demo-2 intentionally overlap (9:00–10:00 and 9:30–10:30)

@@ -16,9 +16,7 @@ def match_title(title: str, rules: list[Rule]) -> MatchResult:
     winner = matched[0]
     return MatchResult(
         rule_id=winner.id,
-        project_id=winner.project_id,
-        project_name=winner.project_name,
-        task_id=winner.task_id,
-        task_name=winner.task_name,
+        contract_id=winner.contract_id,
+        contract_name=winner.contract_name,
         alternative_rule_ids=[r.id for r in matched[1:]],
     )

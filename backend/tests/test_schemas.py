@@ -1,6 +1,6 @@
 from datetime import date, datetime
 
-from app.schemas import CalendarEvent, Rule, RuleCreate, PushEntry
+from app.schemas import CalendarEvent, OdooRef, PushEntry, RuleCreate
 
 
 def test_calendar_event_roundtrip():
@@ -20,23 +20,25 @@ def test_rule_create_defaults_active_true():
     rc = RuleCreate(
         name="GreenVolt",
         keywords=["greenvolt"],
-        project_id=10,
-        project_name="GreenVolt",
-        task_id=55,
-        task_name="Meetings",
+        contract_id=10,
+        contract_name="[10] GreenVolt",
         priority=1,
     )
     assert rc.active is True
+    assert rc.contract_id == 10
 
 
-def test_push_entry_requires_targets():
+def test_push_entry_requires_contract():
     pe = PushEntry(
         uid="abc",
         start=datetime(2026, 6, 1, 9, 0),
-        date=date(2026, 6, 1),
-        hours=0.5,
+        end=datetime(2026, 6, 1, 9, 30),
         description="GreenVolt standup",
-        project_id=10,
-        task_id=55,
+        contract_id=10,
     )
-    assert pe.project_id == 10
+    assert pe.contract_id == 10
+
+
+def test_odoo_ref_coerces_falsy_name():
+    ref = OdooRef(id=5, name=False)
+    assert ref.name == ""

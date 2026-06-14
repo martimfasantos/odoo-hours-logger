@@ -8,8 +8,8 @@ from fastapi.testclient import TestClient
 from app import deps
 from app.colors import ColorStore
 from app.config import Settings
-from app.main import app
 from app.ledger import Ledger
+from app.main import app
 from app.odoo_client import OdooClient
 from app.rules import RulesStore
 from app.schemas import CalendarEvent, OdooRef
@@ -22,17 +22,16 @@ def client(tmp_path, monkeypatch):
     cs = ColorStore(tmp_path / "project_colors.json")
 
     fake_odoo = MagicMock(spec=OdooClient)
-    fake_odoo.list_projects.return_value = [OdooRef(id=10, name="GreenVolt")]
-    fake_odoo.list_tasks.return_value = [OdooRef(id=55, name="Meetings")]
+    fake_odoo.list_contracts.return_value = [OdooRef(id=10, name="[10] GreenVolt")]
+    fake_odoo.existing_entries.return_value = []
     fake_odoo.create_timesheet.return_value = 500
     fake_odoo.test_connection.return_value = True
 
     fake_settings = Settings(
         GOOGLE_CALENDAR_URL="https://example.com/calendar.ics",
         ODOO_URL="https://odoo.example.com",
-        ODOO_DB="testdb",
-        ODOO_USERNAME="user@example.com",
-        ODOO_API_KEY="testkey",
+        ODOO_DB="odoo",
+        ODOO_SESSION_ID="sess-123",
         DEMO_MODE=False,
         DATA_DIR=str(tmp_path),
     )
@@ -52,18 +51,25 @@ def test_health(client):
     assert c.get("/api/health").json() == {"status": "ok"}
 
 
-def test_projects_endpoint(client):
-    c, _, _ = client
-    resp = c.get("/api/odoo/projects")
+def test_contracts_endpoint(client):
+    c, fake_odoo, _ = client
+    resp = c.get("/api/odoo/contracts")
     assert resp.status_code == 200
-    assert resp.json()[0]["name"] == "GreenVolt"
+    assert resp.json()[0]["name"] == "[10] GreenVolt"
+    fake_odoo.list_contracts.assert_called_once()
+
+
+def test_contracts_endpoint_passes_query(client):
+    c, fake_odoo, _ = client
+    c.get("/api/odoo/contracts?query=green")
+    fake_odoo.list_contracts.assert_called_once_with("green")
 
 
 def test_rules_crud_flow(client):
     c, _, _ = client
     payload = {"name": "GreenVolt", "keywords": ["greenvolt"],
-               "project_id": 10, "project_name": "GreenVolt",
-               "task_id": 55, "task_name": "Meetings", "priority": 1}
+               "contract_id": 10, "contract_name": "[10] GreenVolt",
+               "priority": 1}
     created = c.post("/api/rules", json=payload).json()
     assert created["id"] == 1
     assert len(c.get("/api/rules").json()) == 1
@@ -71,32 +77,30 @@ def test_rules_crud_flow(client):
     assert c.get("/api/rules").json() == []
 
 
-def test_push_creates_line_and_records_ledger(client):
+def test_push_creates_entry_and_records_ledger(client):
     c, fake_odoo, lg = client
     entry = {
         "uid": "evt-1",
         "start": "2026-06-01T09:00:00",
-        "date": "2026-06-01",
-        "hours": 0.5,
+        "end": "2026-06-01T09:30:00",
         "description": "GreenVolt standup",
-        "project_id": 10,
-        "task_id": 55,
+        "contract_id": 10,
     }
     resp = c.post("/api/timesheet/push", json={"entries": [entry]})
     body = resp.json()
     assert body["results"][0]["success"] is True
-    assert body["results"][0]["odoo_line_id"] == 500
+    assert body["results"][0]["odoo_id"] == 500
     fake_odoo.create_timesheet.assert_called_once()
     assert lg.is_logged("evt-1", datetime(2026, 6, 1, 9, 0)) is True
 
 
 def test_push_skips_already_logged(client):
     c, fake_odoo, lg = client
-    lg.record("evt-1", datetime(2026, 6, 1, 9, 0), odoo_line_id=1,
-              project_id=10, task_id=55, hours=0.5, pushed_at="x")
+    lg.record("evt-1", datetime(2026, 6, 1, 9, 0), odoo_id=1,
+              contract_id=10, pushed_at="x")
     entry = {
-        "uid": "evt-1", "start": "2026-06-01T09:00:00", "date": "2026-06-01",
-        "hours": 0.5, "description": "x", "project_id": 10, "task_id": 55,
+        "uid": "evt-1", "start": "2026-06-01T09:00:00",
+        "end": "2026-06-01T09:30:00", "description": "x", "contract_id": 10,
     }
     resp = c.post("/api/timesheet/push", json={"entries": [entry]})
     assert resp.json()["results"][0]["success"] is False
@@ -126,8 +130,7 @@ def demo_client(tmp_path):
         GOOGLE_CALENDAR_URL="",
         ODOO_URL="",
         ODOO_DB="",
-        ODOO_USERNAME="",
-        ODOO_API_KEY="",
+        ODOO_SESSION_ID="",
         DEMO_MODE=True,
         DATA_DIR=str(tmp_path),
     )
@@ -141,16 +144,15 @@ def demo_client(tmp_path):
     app.dependency_overrides.clear()
 
 
-def test_demo_projects(demo_client):
+def test_demo_contracts(demo_client):
     c, _ = demo_client
-    resp = c.get("/api/odoo/projects")
+    resp = c.get("/api/odoo/contracts")
     assert resp.status_code == 200
     data = resp.json()
     assert len(data) == 3
     names = {p["name"] for p in data}
-    assert "GreenVolt" in names
-    assert "Lisport" in names
-    assert "Internal" in names
+    assert "[9001] Demo Client A" in names
+    assert "[9003] Internal" in names
 
 
 def test_demo_events_returns_sample(demo_client):
@@ -168,20 +170,17 @@ def test_demo_push_simulates_and_dedups(demo_client):
     entry = {
         "uid": "demo-1",
         "start": "2026-06-08T09:00:00+01:00",
-        "date": "2026-06-08",
-        "hours": 0.5,
+        "end": "2026-06-08T10:00:00+01:00",
         "description": "GreenVolt standup",
-        "project_id": 101,
-        "task_id": 1001,
+        "contract_id": 9001,
     }
     resp = c.post("/api/timesheet/push", json={"entries": [entry]})
     assert resp.status_code == 200
     result = resp.json()["results"][0]
     assert result["success"] is True
-    assert result["odoo_line_id"] is not None
+    assert result["odoo_id"] is not None
 
     # Verify ledger recorded it
-    from datetime import datetime, timezone
     start_dt = datetime.fromisoformat(entry["start"])
     assert lg.is_logged("demo-1", start_dt) is True
 
@@ -243,6 +242,52 @@ def test_daily_groups_events_by_date(client, monkeypatch):
     assert "2026-06-01" in body
     assert "2026-06-02" in body
     assert len(body["2026-06-01"]) == 2
+
+
+def test_already_logged_from_odoo_existing_entry(client, monkeypatch):
+    c, fake_odoo, _ = client
+
+    # A rule that matches the event title to contract 10.
+    c.post("/api/rules", json={
+        "name": "GreenVolt", "keywords": ["greenvolt"],
+        "contract_id": 10, "contract_name": "[10] GreenVolt", "priority": 1,
+    })
+
+    tz = timezone.utc
+    ev = CalendarEvent(
+        uid="evt-x", title="GreenVolt standup",
+        start=datetime(2026, 6, 1, 9, 0, tzinfo=tz),
+        end=datetime(2026, 6, 1, 9, 30, tzinfo=tz),
+        hours=0.5, date=Date(2026, 6, 1),
+    )
+    monkeypatch.setattr("app.main._load_events", lambda start, end, settings: [ev])
+    fake_odoo.existing_entries.return_value = [{
+        "contract_id": 10,
+        "start_time": "2026-06-01 09:00:00",
+        "end_time": "2026-06-01 09:30:00",
+        "work_description": "GreenVolt standup",
+    }]
+
+    resp = c.get("/api/calendar/events?start=2026-06-01&end=2026-06-01")
+    assert resp.status_code == 200
+    assert resp.json()[0]["already_logged"] is True
+
+
+def test_proposals_tolerate_odoo_failure(client, monkeypatch):
+    c, fake_odoo, _ = client
+    tz = timezone.utc
+    ev = CalendarEvent(
+        uid="evt-y", title="Anything",
+        start=datetime(2026, 6, 1, 9, 0, tzinfo=tz),
+        end=datetime(2026, 6, 1, 9, 30, tzinfo=tz),
+        hours=0.5, date=Date(2026, 6, 1),
+    )
+    monkeypatch.setattr("app.main._load_events", lambda start, end, settings: [ev])
+    fake_odoo.existing_entries.side_effect = RuntimeError("session gone")
+
+    resp = c.get("/api/calendar/events?start=2026-06-01&end=2026-06-01")
+    assert resp.status_code == 200
+    assert resp.json()[0]["already_logged"] is False
 
 
 def test_colors_get_empty_initially(client):

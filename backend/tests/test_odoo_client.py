@@ -1,93 +1,215 @@
 # backend/tests/test_odoo_client.py
-from unittest.mock import MagicMock
+from datetime import datetime, timezone
 
-from app.odoo_client import OdooClient
+import pytest
 
-
-def _client():
-    common = MagicMock()
-    common.authenticate.return_value = 7  # uid
-    models = MagicMock()
-    return OdooClient(url="https://odoo.example.com", db="db",
-                      username="me", api_key="key",
-                      common=common, models=models)
+from app.odoo_client import OdooClient, OdooSessionExpired, to_odoo_utc
 
 
-def test_authenticate_caches_uid():
-    c = _client()
-    assert c.uid() == 7
-    assert c.uid() == 7
-    c.common.authenticate.assert_called_once()
+class FakeResponse:
+    def __init__(self, payload, content_type="application/json"):
+        self._payload = payload
+        self.headers = {"content-type": content_type}
+
+    def json(self):
+        return self._payload
 
 
-def test_list_projects_returns_refs():
-    c = _client()
-    c.models.execute_kw.return_value = [{"id": 10, "name": "GreenVolt"}]
-    projects = c.list_projects()
-    assert projects[0].id == 10
-    assert projects[0].name == "GreenVolt"
-    args = c.models.execute_kw.call_args[0]
-    assert args[3] == "project.project"
-    assert args[4] == "search_read"
+class FakeHttp:
+    """Stub httpx.Client whose .post returns canned JSON-RPC responses.
+
+    `responses` is a list consumed in order; each item is a FakeResponse.
+    Captured calls are recorded in `self.calls` as (url, json_body) tuples.
+    """
+
+    def __init__(self, responses):
+        self._responses = list(responses)
+        self.calls = []
+
+    def post(self, url, json=None):
+        self.calls.append((url, json))
+        if self._responses:
+            return self._responses.pop(0)
+        return FakeResponse({"result": []})
 
 
-def test_list_tasks_filters_by_project():
-    c = _client()
-    c.models.execute_kw.return_value = [{"id": 55, "name": "Meetings"}]
-    tasks = c.list_tasks(10)
-    domain = c.models.execute_kw.call_args[0][5][0]
-    assert domain == [["project_id", "=", 10]]
-    assert tasks[0].name == "Meetings"
+def _client(responses, **kwargs):
+    http = FakeHttp(responses)
+    client = OdooClient(
+        base_url="https://odoo.example.com",
+        session_id="sess-123",
+        local_tz="Europe/Lisbon",
+        db="odoo",
+        visitor_uuid="vis-1",
+        http_client=http,
+        **kwargs,
+    )
+    return client, http
 
 
-def test_create_timesheet_returns_line_id():
-    c = _client()
-    c.models.execute_kw.side_effect = [
-        [{"id": 99}],  # employee lookup
-        500,            # create
-    ]
-    line_id = c.create_timesheet(date="2026-06-01", name="GreenVolt standup",
-                                 hours=0.5, project_id=10, task_id=55)
-    assert line_id == 500
-    create_call = c.models.execute_kw.call_args_list[-1][0]
-    assert create_call[3] == "account.analytic.line"
-    assert create_call[4] == "create"
-    vals = create_call[5][0]
-    assert vals["unit_amount"] == 0.5
-    assert vals["project_id"] == 10
-    assert vals["employee_id"] == 99
+def _ok(result):
+    return FakeResponse({"jsonrpc": "2.0", "result": result})
 
 
-def test_employee_id_is_cached():
-    c = _client()
-    c.models.execute_kw.return_value = [{"id": 99}]
-    assert c.employee_id() == 99
-    assert c.employee_id() == 99
-    c.models.execute_kw.assert_called_once()
+def test_to_odoo_utc_formats_in_utc():
+    dt = datetime(2026, 6, 1, 10, 0, tzinfo=timezone.utc)
+    assert to_odoo_utc(dt) == "2026-06-01 10:00:00"
+
+
+def test_call_kw_envelope_and_shape():
+    c, http = _client([_ok([{"id": 1}])])
+    result = c.call_kw("contract", "search_read", [[]], {"limit": 5})
+    assert result == [{"id": 1}]
+    url, body = http.calls[0]
+    assert url == "https://odoo.example.com/web/dataset/call_kw/contract/search_read"
+    assert body["jsonrpc"] == "2.0"
+    assert body["method"] == "call"
+    params = body["params"]
+    assert params["model"] == "contract"
+    assert params["method"] == "search_read"
+    assert params["args"] == [[]]
+    assert params["kwargs"] == {"limit": 5}
+
+
+def test_list_contracts_parses_rows():
+    c, http = _client([_ok([
+        {"id": 10, "display_name": "[10] Client A"},
+        {"id": 20, "display_name": "[20] Client B"},
+    ])])
+    contracts = c.list_contracts()
+    assert [(r.id, r.name) for r in contracts] == [
+        (10, "[10] Client A"), (20, "[20] Client B")]
+    _, body = http.calls[0]
+    params = body["params"]
+    assert params["model"] == "contract"
+    assert params["args"] == [[]]
+    assert params["kwargs"]["fields"] == ["display_name"]
+    assert params["kwargs"]["order"] == "display_name"
+
+
+def test_list_contracts_applies_ilike_query():
+    c, http = _client([_ok([])])
+    c.list_contracts(query="green")
+    _, body = http.calls[0]
+    assert body["params"]["args"] == [[["display_name", "ilike", "green"]]]
+
+
+def test_list_contracts_coerces_falsy_name():
+    c, _ = _client([_ok([{"id": 5, "display_name": False}])])
+    contracts = c.list_contracts()
+    assert contracts[0].id == 5
+    assert contracts[0].name == ""
+
+
+def test_create_timesheet_payload_and_utc():
+    # uid override and member override avoid extra round-trips.
+    c, http = _client([_ok(777)], user_id=1098, network_member_id=1095)
+    tz = timezone.utc
+    start = datetime(2026, 6, 1, 9, 0, tzinfo=tz)
+    end = datetime(2026, 6, 1, 9, 30, tzinfo=tz)
+    new_id = c.create_timesheet(contract_id=42, description="Standup",
+                                start=start, end=end)
+    assert new_id == 777
+    _, body = http.calls[0]
+    params = body["params"]
+    assert params["model"] == "timesheet_entry"
+    assert params["method"] == "create"
+    vals = params["args"][0]
+    assert vals["network_member"] == 1095
+    assert vals["contract"] == 42
+    assert vals["work_description"] == "Standup"
+    assert vals["start_time"] == "2026-06-01 09:00:00"
+    assert vals["end_time"] == "2026-06-01 09:30:00"
+    ctx = params["kwargs"]["context"]
+    assert ctx["uid"] == 1098
+    assert ctx["tz"] == "Europe/Lisbon"
+    assert ctx["default_start_time"] == "2026-06-01 09:00:00"
+    assert ctx["default_end_time"] == "2026-06-01 09:30:00"
+
+
+def test_existing_entries_normalization():
+    c, _ = _client([_ok([
+        {"contract": [42, "[42] Client A"],
+         "start_time": "2026-06-01 09:00:00",
+         "end_time": "2026-06-01 09:30:00",
+         "work_description": "Standup",
+         "duration_h": 0.5},
+    ])], user_id=1098)
+    start = datetime(2026, 6, 1, 0, 0, tzinfo=timezone.utc)
+    end = datetime(2026, 6, 1, 23, 59, tzinfo=timezone.utc)
+    rows = c.existing_entries(start, end)
+    assert rows == [{
+        "contract_id": 42,
+        "start_time": "2026-06-01 09:00:00",
+        "end_time": "2026-06-01 09:30:00",
+        "work_description": "Standup",
+    }]
+
+
+def test_uid_resolution_and_caching():
+    c, http = _client([
+        _ok({"uid": 1098, "username": "me"}),
+    ])
+    assert c.uid() == 1098
+    assert c.uid() == 1098  # cached — no second call
+    assert len(http.calls) == 1
+    assert http.calls[0][0].endswith("/web/session/get_session_info")
+
+
+def test_uid_override_skips_session_call():
+    c, http = _client([], user_id=1098)
+    assert c.uid() == 1098
+    assert http.calls == []
+
+
+def test_network_member_resolution_and_caching():
+    c, http = _client([
+        _ok({"uid": 1098}),          # session_info for uid
+        _ok([{"id": 1095}]),         # network_member search_read
+    ])
+    assert c.network_member_id() == 1095
+    assert c.network_member_id() == 1095  # cached
+    # 2 calls total: one for uid, one for member lookup.
+    assert len(http.calls) == 2
+    member_call = http.calls[1][1]["params"]
+    assert member_call["model"] == "network_member"
+    assert member_call["args"] == [[["user", "=", 1098]]]
+
+
+def test_network_member_missing_raises():
+    c, _ = _client([_ok([])], user_id=1098)
+    with pytest.raises(RuntimeError):
+        c.network_member_id()
+
+
+def test_session_expired_on_html_response():
+    c, _ = _client([FakeResponse("<html>login</html>", content_type="text/html")])
+    with pytest.raises(OdooSessionExpired):
+        c.session_info()
+
+
+def test_session_expired_on_null_uid():
+    c, _ = _client([_ok({"uid": False})])
+    with pytest.raises(OdooSessionExpired):
+        c.uid()
+
+
+def test_error_mentioning_session_raises_expired():
+    c, _ = _client([FakeResponse(
+        {"error": {"data": {"message": "Session expired"}}})])
+    with pytest.raises(OdooSessionExpired):
+        c.session_info()
+
+
+def test_generic_error_raises_runtime_error():
+    c, _ = _client([FakeResponse(
+        {"error": {"data": {"message": "Boom"}}})])
+    with pytest.raises(RuntimeError) as excinfo:
+        c.session_info()
+    assert "Boom" in str(excinfo.value)
+    assert not isinstance(excinfo.value, OdooSessionExpired)
 
 
 def test_test_connection_true():
-    c = _client()
+    c, _ = _client([], user_id=1098)
     assert c.test_connection() is True
-
-
-def test_list_projects_coerces_falsy_name():
-    c = _client()
-    c.models.execute_kw.return_value = [{"id": 10, "name": False}]
-    projects = c.list_projects()
-    assert len(projects) == 1
-    assert projects[0].id == 10
-    assert projects[0].name == ""
-
-
-def test_create_timesheet_omits_task_id_when_none():
-    c = _client()
-    c.models.execute_kw.side_effect = [
-        [{"id": 99}],  # employee lookup
-        500,            # create
-    ]
-    c.create_timesheet(date="2026-06-01", name="x", hours=1.0,
-                       project_id=10, task_id=None)
-    vals = c.models.execute_kw.call_args_list[-1][0][5][0]
-    assert "task_id" not in vals
-    assert vals["project_id"] == 10

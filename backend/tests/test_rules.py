@@ -1,4 +1,6 @@
 # backend/tests/test_rules.py
+import json
+
 from app.rules import RulesStore
 from app.schemas import RuleCreate
 
@@ -9,8 +11,8 @@ def _store(tmp_path):
 
 def _payload(name="GreenVolt"):
     return RuleCreate(
-        name=name, keywords=["greenvolt"], project_id=10,
-        project_name="GreenVolt", task_id=55, task_name="Meetings", priority=1,
+        name=name, keywords=["greenvolt"], contract_id=10,
+        contract_name="[10] GreenVolt", priority=1,
     )
 
 
@@ -37,8 +39,8 @@ def test_update_changes_fields(tmp_path):
     s = _store(tmp_path)
     r = s.create(_payload())
     updated = s.update(r.id, RuleCreate(
-        name="GreenVolt", keywords=["gv", "greenvolt"], project_id=10,
-        project_name="GreenVolt", task_id=55, task_name="Meetings", priority=5,
+        name="GreenVolt", keywords=["gv", "greenvolt"], contract_id=10,
+        contract_name="[10] GreenVolt", priority=5,
     ))
     assert updated.priority == 5
     assert "gv" in updated.keywords
@@ -55,3 +57,20 @@ def test_corrupt_file_returns_empty(tmp_path):
     path = tmp_path / "rules.json"
     path.write_text("{not json")
     assert RulesStore(path).list() == []
+
+
+def test_list_skips_stale_old_shaped_rules(tmp_path):
+    path = tmp_path / "rules.json"
+    # First record uses the legacy project/task shape and must be skipped;
+    # the second is a valid contract-based rule.
+    path.write_text(json.dumps([
+        {"id": 1, "name": "Legacy", "keywords": ["x"],
+         "project_id": 101, "project_name": "GreenVolt",
+         "task_id": None, "task_name": None, "priority": 100, "active": True},
+        {"id": 2, "name": "New", "keywords": ["y"],
+         "contract_id": 50, "contract_name": "[50] Client", "priority": 1,
+         "active": True},
+    ]))
+    rules = RulesStore(path).list()
+    assert [r.id for r in rules] == [2]
+    assert rules[0].contract_id == 50
