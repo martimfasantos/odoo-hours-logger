@@ -1,9 +1,10 @@
 # backend/tests/test_odoo_client.py
 from datetime import datetime, timezone
 
+import httpx
 import pytest
 
-from app.odoo_client import OdooClient, OdooSessionExpired, to_odoo_utc
+from app.odoo_client import OdooClient, OdooSessionExpired, OdooUnreachable, parse_odoo_utc, to_odoo_utc
 
 
 class FakeResponse:
@@ -54,6 +55,17 @@ def _ok(result):
 def test_to_odoo_utc_formats_in_utc():
     dt = datetime(2026, 6, 1, 10, 0, tzinfo=timezone.utc)
     assert to_odoo_utc(dt) == "2026-06-01 10:00:00"
+
+
+def test_parse_odoo_utc_converts_to_local_tz():
+    from zoneinfo import ZoneInfo
+    result = parse_odoo_utc("2026-06-01 09:00:00", "Europe/Lisbon")
+    assert result.tzinfo is not None
+    # Europe/Lisbon in summer is UTC+1
+    assert result.astimezone(timezone.utc) == datetime(2026, 6, 1, 9, 0, tzinfo=timezone.utc)
+    # Should be in Europe/Lisbon tz, so hour is 10 (UTC+1 in June)
+    assert result.hour == 10
+    assert result.tzinfo == ZoneInfo("Europe/Lisbon")
 
 
 def test_call_kw_envelope_and_shape():
@@ -160,10 +172,29 @@ def test_existing_entries_normalization():
     rows = c.existing_entries(start, end)
     assert rows == [{
         "contract_id": 42,
+        "contract_name": "[42] Client A",
         "start_time": "2026-06-01 09:00:00",
         "end_time": "2026-06-01 09:30:00",
         "work_description": "Standup",
+        "duration_h": 0.5,
     }]
+
+
+def test_existing_entries_falsy_contract():
+    """When contract is False/None, contract_id is None and contract_name is ''."""
+    c, _ = _client([_ok([
+        {"contract": False,
+         "start_time": "2026-06-01 09:00:00",
+         "end_time": "2026-06-01 09:30:00",
+         "work_description": "",
+         "duration_h": 1.0},
+    ])], user_id=1098)
+    start = datetime(2026, 6, 1, 0, 0, tzinfo=timezone.utc)
+    end = datetime(2026, 6, 1, 23, 59, tzinfo=timezone.utc)
+    rows = c.existing_entries(start, end)
+    assert rows[0]["contract_id"] is None
+    assert rows[0]["contract_name"] == ""
+    assert rows[0]["duration_h"] == 1.0
 
 
 def test_uid_resolution_and_caching():
@@ -256,3 +287,27 @@ def test_user_email_propagates_session_expired():
 def test_test_connection_true():
     c, _ = _client([], user_id=1098)
     assert c.test_connection() is True
+
+
+def test_connect_error_raises_odoo_unreachable():
+    """httpx.ConnectError (and any RequestError) must surface as OdooUnreachable."""
+
+    class ErrorHttp:
+        headers = {}
+        cookies = {}
+
+        def post(self, url, json=None):
+            raise httpx.ConnectError("boom")
+
+    client = OdooClient(
+        base_url="https://odoo.example.com",
+        session_id="sess-123",
+        local_tz="Europe/Lisbon",
+        db="odoo",
+        http_client=ErrorHttp(),
+    )
+    with pytest.raises(OdooUnreachable):
+        client.session_info()
+
+    with pytest.raises(OdooUnreachable):
+        client.call_kw("contract", "search_read", [[]])

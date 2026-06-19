@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
 from typing import Optional
+from zoneinfo import ZoneInfo
 
 import httpx
 
@@ -10,9 +11,22 @@ class OdooSessionExpired(RuntimeError):
     """Raised when the Odoo session cookie is missing or expired."""
 
 
+class OdooUnreachable(RuntimeError):
+    """Raised when Odoo cannot be reached (e.g. VPN is off)."""
+
+
 def to_odoo_utc(dt: datetime) -> str:
     """Convert a tz-aware datetime to Odoo's UTC string format."""
     return dt.astimezone(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+
+
+def parse_odoo_utc(odoo_str: str, local_tz: str) -> datetime:
+    """Parse an Odoo UTC string ("YYYY-MM-DD HH:MM:SS") and return a
+    tz-aware datetime in the given local timezone."""
+    dt_utc = datetime.strptime(odoo_str, "%Y-%m-%d %H:%M:%S").replace(
+        tzinfo=timezone.utc
+    )
+    return dt_utc.astimezone(ZoneInfo(local_tz))
 
 
 _EXPIRED_HINTS = ("session", "expired", "login")
@@ -46,8 +60,11 @@ class OdooClient:
             "Content-Type": "application/json",
         }
         if http_client is None:
+            # Short connect timeout so an unreachable Odoo (e.g. VPN off) fails
+            # fast and surfaces the "check your VPN" prompt quickly; allow a
+            # longer read timeout for normal (slower) responses.
             http_client = httpx.Client(headers=headers, cookies=cookies,
-                                       timeout=30.0)
+                                       timeout=httpx.Timeout(20.0, connect=6.0))
         else:
             # Allow injecting a pre-built client (e.g. tests) but still apply
             # headers/cookies when the client supports it.
@@ -64,7 +81,12 @@ class OdooClient:
 
     def _call(self, path: str, params: dict) -> dict:
         envelope = {"jsonrpc": "2.0", "method": "call", "params": params}
-        resp = self._http.post(f"{self.base_url}{path}", json=envelope)
+        try:
+            resp = self._http.post(f"{self.base_url}{path}", json=envelope)
+        except httpx.RequestError as exc:
+            raise OdooUnreachable(
+                "Could not reach Odoo — check your VPN connection."
+            ) from exc
         content_type = resp.headers.get("content-type", "")
         if "json" not in content_type.lower():
             # HTML login page → session is gone.
@@ -152,13 +174,19 @@ class OdooClient:
         normalized = []
         for row in rows or []:
             contract = row.get("contract")
-            contract_id = contract[0] if isinstance(contract, (list, tuple)) \
-                and contract else None
+            if isinstance(contract, (list, tuple)) and contract:
+                contract_id = contract[0]
+                contract_name = contract[1] if len(contract) > 1 else ""
+            else:
+                contract_id = None
+                contract_name = ""
             normalized.append({
                 "contract_id": contract_id,
+                "contract_name": contract_name or "",
                 "start_time": row.get("start_time"),
                 "end_time": row.get("end_time"),
-                "work_description": row.get("work_description"),
+                "work_description": row.get("work_description") or "",
+                "duration_h": float(row.get("duration_h") or 0.0),
             })
         return normalized
 

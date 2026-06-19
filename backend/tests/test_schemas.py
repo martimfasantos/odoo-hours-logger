@@ -22,7 +22,6 @@ def test_rule_create_defaults_active_true():
         keywords=["greenvolt"],
         contract_id=10,
         contract_name="[10] GreenVolt",
-        priority=1,
     )
     assert rc.active is True
     assert rc.contract_id == 10

@@ -11,7 +11,7 @@ from app.config import Settings
 from app.ignore import IgnoreStore
 from app.ledger import Ledger
 from app.main import app
-from app.odoo_client import OdooClient
+from app.odoo_client import OdooClient, OdooUnreachable, OdooSessionExpired
 from app.rules import RulesStore
 from app.schemas import CalendarEvent, OdooRef
 
@@ -72,8 +72,7 @@ def test_contracts_endpoint_passes_query(client):
 def test_rules_crud_flow(client):
     c, _, _ = client
     payload = {"name": "GreenVolt", "keywords": ["greenvolt"],
-               "contract_id": 10, "contract_name": "[10] GreenVolt",
-               "priority": 1}
+               "contract_id": 10, "contract_name": "[10] GreenVolt"}
     created = c.post("/api/rules", json=payload).json()
     assert created["id"] == 1
     assert len(c.get("/api/rules").json()) == 1
@@ -204,6 +203,7 @@ def test_demo_test_connection(demo_client):
     body = resp.json()
     assert body["odoo"] is True
     assert body["calendar"] is True
+    assert body["odoo_unreachable"] is False
     assert body["errors"] == {}
 
 
@@ -256,7 +256,7 @@ def test_already_logged_from_odoo_existing_entry(client, monkeypatch):
     # A rule that matches the event title to contract 10.
     c.post("/api/rules", json={
         "name": "GreenVolt", "keywords": ["greenvolt"],
-        "contract_id": 10, "contract_name": "[10] GreenVolt", "priority": 1,
+        "contract_id": 10, "contract_name": "[10] GreenVolt",
     })
 
     tz = timezone.utc
@@ -269,9 +269,11 @@ def test_already_logged_from_odoo_existing_entry(client, monkeypatch):
     monkeypatch.setattr("app.main._load_events", lambda start, end, settings, user_email="": [ev])
     fake_odoo.existing_entries.return_value = [{
         "contract_id": 10,
+        "contract_name": "[10] GreenVolt",
         "start_time": "2026-06-01 09:00:00",
         "end_time": "2026-06-01 09:30:00",
         "work_description": "GreenVolt standup",
+        "duration_h": 0.5,
     }]
 
     resp = c.get("/api/calendar/events?start=2026-06-01&end=2026-06-01")
@@ -368,3 +370,209 @@ def test_demo_ignore_filters_team_lunch_event(demo_client):
     titles = [entry["event"]["title"] for entry in resp.json()]
     # "Team lunch" should be filtered out.
     assert not any("lunch" in t.lower() for t in titles)
+
+
+# ---------------------------------------------------------------------------
+# Overview endpoint tests
+# ---------------------------------------------------------------------------
+
+def test_overview_demo_returns_both_statuses(demo_client):
+    """DEMO_MODE: /api/overview returns by_contract and blocks with both statuses."""
+    c, _, _ = demo_client
+    # Add a rule so demo calendar events match a contract and appear as to_log.
+    c.post("/api/rules", json={
+        "name": "GreenVolt", "keywords": ["greenvolt"],
+        "contract_id": 9001, "contract_name": "[9001] Demo Client A",
+    })
+    resp = c.get("/api/overview?start=2026-06-08&end=2026-06-12")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert "by_contract" in body
+    assert "blocks" in body
+
+    statuses = {blk["status"] for blk in body["blocks"]}
+    assert "logged" in statuses, "Expected at least one logged block in demo mode"
+    assert "to_log" in statuses, "Expected at least one to_log block when rules match"
+
+    # Verify by_contract structure
+    assert len(body["by_contract"]) >= 1
+    for bc in body["by_contract"]:
+        assert "contract_id" in bc
+        assert "contract_name" in bc
+        assert "logged_hours" in bc
+        assert "to_log_hours" in bc
+
+
+def test_overview_demo_aggregation_consistent(demo_client):
+    """DEMO_MODE: by_contract sums must equal the sum of matching blocks."""
+    c, _, _ = demo_client
+    resp = c.get("/api/overview?start=2026-06-08&end=2026-06-12")
+    assert resp.status_code == 200
+    body = resp.json()
+
+    # Rebuild sums from blocks and compare to by_contract.
+    from collections import defaultdict
+    logged_sums: dict = defaultdict(float)
+    to_log_sums: dict = defaultdict(float)
+    for blk in body["blocks"]:
+        cid = blk.get("contract_id")
+        if cid is None:
+            continue
+        if blk["status"] == "logged":
+            logged_sums[cid] += blk["hours"]
+        else:
+            to_log_sums[cid] += blk["hours"]
+
+    for bc in body["by_contract"]:
+        cid = bc["contract_id"]
+        assert round(logged_sums.get(cid, 0.0), 2) == bc["logged_hours"]
+        assert round(to_log_sums.get(cid, 0.0), 2) == bc["to_log_hours"]
+
+
+def test_overview_non_demo_uses_odoo_entries(client, monkeypatch):
+    """Non-demo mode: logged blocks come from odoo.existing_entries."""
+    c, fake_odoo, _ = client
+
+    # Add a rule so calendar events can be marked to_log.
+    c.post("/api/rules", json={
+        "name": "GreenVolt", "keywords": ["meeting"],
+        "contract_id": 10, "contract_name": "[10] GreenVolt",
+    })
+
+    tz = timezone.utc
+    ev = CalendarEvent(
+        uid="evt-ov1", title="Meeting to log",
+        start=datetime(2026, 6, 9, 10, 0, tzinfo=tz),
+        end=datetime(2026, 6, 9, 11, 0, tzinfo=tz),
+        hours=1.0, date=Date(2026, 6, 9),
+    )
+    monkeypatch.setattr("app.main._load_events",
+                        lambda start, end, settings, user_email="": [ev])
+
+    fake_odoo.existing_entries.return_value = [
+        {
+            "contract_id": 10,
+            "contract_name": "[10] GreenVolt",
+            "start_time": "2026-06-08 08:00:00",
+            "end_time": "2026-06-08 09:30:00",
+            "work_description": "Previous logged work",
+            "duration_h": 1.5,
+        },
+    ]
+
+    resp = c.get("/api/overview?start=2026-06-08&end=2026-06-12")
+    assert resp.status_code == 200
+    body = resp.json()
+
+    statuses = [blk["status"] for blk in body["blocks"]]
+    assert "logged" in statuses
+    assert "to_log" in statuses
+
+    # The logged block should reflect the Odoo entry.
+    logged_blocks = [b for b in body["blocks"] if b["status"] == "logged"]
+    assert any(b["hours"] == 1.5 for b in logged_blocks)
+
+    # by_contract for contract 10 must sum correctly.
+    bc10 = next(bc for bc in body["by_contract"] if bc["contract_id"] == 10)
+    assert bc10["logged_hours"] == 1.5
+    assert bc10["to_log_hours"] == 1.0
+
+
+def test_overview_odoo_failure_still_returns_to_log(client, monkeypatch):
+    """If Odoo raises, the overview endpoint still returns 200 with to_log blocks."""
+    c, fake_odoo, _ = client
+
+    c.post("/api/rules", json={
+        "name": "GreenVolt", "keywords": ["meeting"],
+        "contract_id": 10, "contract_name": "[10] GreenVolt",
+    })
+
+    tz = timezone.utc
+    ev = CalendarEvent(
+        uid="evt-ov2", title="Meeting to log",
+        start=datetime(2026, 6, 9, 10, 0, tzinfo=tz),
+        end=datetime(2026, 6, 9, 11, 0, tzinfo=tz),
+        hours=1.0, date=Date(2026, 6, 9),
+    )
+    monkeypatch.setattr("app.main._load_events",
+                        lambda start, end, settings, user_email="": [ev])
+    fake_odoo.existing_entries.side_effect = RuntimeError("Odoo unreachable")
+
+    resp = c.get("/api/overview?start=2026-06-08&end=2026-06-12")
+    assert resp.status_code == 200
+    body = resp.json()
+
+    to_log_blocks = [b for b in body["blocks"] if b["status"] == "to_log"]
+    assert len(to_log_blocks) >= 1
+    # No logged blocks since Odoo failed.
+    logged_blocks = [b for b in body["blocks"] if b["status"] == "logged"]
+    assert logged_blocks == []
+
+
+# ---------------------------------------------------------------------------
+# OdooUnreachable surface tests
+# ---------------------------------------------------------------------------
+
+def test_test_connection_odoo_unreachable(client):
+    """test-connection returns odoo_unreachable=True when OdooUnreachable is raised."""
+    c, fake_odoo, _ = client
+    fake_odoo.test_connection.side_effect = OdooUnreachable(
+        "Could not reach Odoo — check your VPN connection."
+    )
+    resp = c.post("/api/settings/test-connection")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["odoo"] is False
+    assert body["odoo_unreachable"] is True
+    assert "VPN" in body["errors"]["odoo"] or "Odoo" in body["errors"]["odoo"]
+
+
+def test_contracts_odoo_unreachable_returns_503(client):
+    """GET /api/odoo/contracts returns 503 with VPN hint when Odoo is unreachable."""
+    c, fake_odoo, _ = client
+    fake_odoo.list_contracts.side_effect = OdooUnreachable(
+        "Could not reach Odoo — check your VPN connection."
+    )
+    resp = c.get("/api/odoo/contracts")
+    assert resp.status_code == 503
+    assert "VPN" in resp.json()["detail"]
+
+
+# ---------------------------------------------------------------------------
+# Config endpoint tests
+# ---------------------------------------------------------------------------
+
+def test_config_get_returns_editable_keys(client):
+    """GET /api/config returns all editable keys including DEMO_MODE as a bool."""
+    c, _, _ = client
+    resp = c.get("/api/config")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert isinstance(body["DEMO_MODE"], bool)
+    assert body["DEMO_MODE"] is False
+    assert "ODOO_SESSION_ID" in body
+    assert "GOOGLE_CALENDAR_URL" in body
+    assert "ODOO_URL" in body
+
+
+def test_config_put_writes_env_file_and_returns_200(client, tmp_path, monkeypatch):
+    """PUT /api/config writes to ENV_PATH and returns a valid config response."""
+    import app.env_file as ef
+
+    env_file_path = tmp_path / ".env"
+    env_file_path.write_text("ODOO_SESSION_ID=oldtoken\nODOO_URL=https://old.example.com\n")
+    monkeypatch.setattr(ef, "ENV_PATH", env_file_path)
+
+    c, _, _ = client
+    resp = c.put("/api/config", json={"ODOO_SESSION_ID": "newtoken", "DEMO_MODE": False})
+    assert resp.status_code == 200
+    body = resp.json()
+    # DEMO_MODE must always be returned as a bool
+    assert isinstance(body["DEMO_MODE"], bool)
+
+    # Verify the tmp .env was updated correctly
+    written = env_file_path.read_text()
+    assert "ODOO_SESSION_ID=newtoken" in written
+    assert "DEMO_MODE=false" in written
+    # Existing unrelated line preserved
+    assert "ODOO_URL=https://old.example.com" in written

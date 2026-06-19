@@ -3,10 +3,10 @@ from app.matcher import match_title
 from app.schemas import Rule
 
 
-def _rule(id, name, keywords, contract_id, priority=100, active=True):
+def _rule(id, name, keywords, contract_id, active=True):
     return Rule(
         id=id, name=name, keywords=keywords, contract_id=contract_id,
-        contract_name=name, priority=priority, active=active,
+        contract_name=name, active=active,
     )
 
 
@@ -24,14 +24,15 @@ def test_match_is_case_insensitive():
     assert m.rule_id == 1
 
 
-def test_priority_decides_winner_and_records_alternatives():
+def test_id_order_decides_winner_and_records_alternatives():
+    # id=1 comes first by id order, so it wins even though id=2 also matches.
     rules = [
-        _rule(1, "Generic", ["sync"], 99, priority=200),
-        _rule(2, "GreenVolt", ["greenvolt"], 10, priority=1),
+        _rule(2, "GreenVolt", ["greenvolt"], 10),
+        _rule(1, "Generic", ["sync"], 99),
     ]
     m = match_title("GreenVolt sync", rules)
-    assert m.rule_id == 2
-    assert m.alternative_rule_ids == [1]
+    assert m.rule_id == 1
+    assert m.alternative_rule_ids == [2]
 
 
 def test_inactive_rule_ignored():

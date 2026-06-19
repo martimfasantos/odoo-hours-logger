@@ -12,7 +12,7 @@ def _store(tmp_path):
 def _payload(name="GreenVolt"):
     return RuleCreate(
         name=name, keywords=["greenvolt"], contract_id=10,
-        contract_name="[10] GreenVolt", priority=1,
+        contract_name="[10] GreenVolt",
     )
 
 
@@ -40,9 +40,8 @@ def test_update_changes_fields(tmp_path):
     r = s.create(_payload())
     updated = s.update(r.id, RuleCreate(
         name="GreenVolt", keywords=["gv", "greenvolt"], contract_id=10,
-        contract_name="[10] GreenVolt", priority=5,
+        contract_name="[10] GreenVolt",
     ))
-    assert updated.priority == 5
     assert "gv" in updated.keywords
 
 

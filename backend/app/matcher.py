@@ -3,11 +3,10 @@ from app.schemas import MatchResult, Rule
 
 def match_title(title: str, rules: list[Rule]) -> MatchResult:
     title_l = (title or "").lower()
-    active = [r for r in rules if r.active]
-    ordered = sorted(active, key=lambda r: r.priority)
+    active = sorted([r for r in rules if r.active], key=lambda r: r.id)
 
     matched = [
-        r for r in ordered
+        r for r in active
         if any(kw.lower() in title_l for kw in r.keywords if kw)
     ]
     if not matched:

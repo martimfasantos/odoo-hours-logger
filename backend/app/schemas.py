@@ -20,7 +20,6 @@ class RuleCreate(BaseModel):
     keywords: list[str]
     contract_id: int
     contract_name: str
-    priority: int = 100
     active: bool = True
 
 
@@ -83,3 +82,38 @@ class ColorUpdate(BaseModel):
         if not re.fullmatch(r"#[0-9a-fA-F]{6}", v):
             raise ValueError("color must be a #RRGGBB hex string")
         return v
+
+
+class OverviewBlock(BaseModel):
+    contract_id: Optional[int] = None
+    contract_name: str
+    title: str
+    start: datetime
+    end: datetime
+    hours: float
+    status: str  # "logged" or "to_log"
+
+
+class ContractOverview(BaseModel):
+    contract_id: int
+    contract_name: str
+    logged_hours: float
+    to_log_hours: float
+
+
+class OverviewResponse(BaseModel):
+    by_contract: list[ContractOverview]
+    blocks: list[OverviewBlock]
+
+
+class ConfigValues(BaseModel):
+    GOOGLE_CALENDAR_URL: Optional[str] = None
+    ODOO_URL: Optional[str] = None
+    ODOO_DB: Optional[str] = None
+    ODOO_SESSION_ID: Optional[str] = None
+    ODOO_VISITOR_UUID: Optional[str] = None
+    ODOO_USER_ID: Optional[int] = None
+    ODOO_NETWORK_MEMBER_ID: Optional[int] = None
+    LOCAL_TZ: Optional[str] = None
+    USER_EMAIL: Optional[str] = None
+    DEMO_MODE: Optional[bool] = None
