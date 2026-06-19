@@ -1,17 +1,22 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { RefreshCw, UploadCloud, AlertTriangle, Check, X, CalendarX2, List, CalendarDays } from "lucide-react";
+import { RefreshCw, UploadCloud, AlertTriangle, Check, X, CalendarX2, List, CalendarDays, PlugZap, Trash2, MoreVertical } from "lucide-react";
 import { api } from "../api/client";
 import type {
   OdooRef,
   ProposedEntry,
   PushEntry,
   PushResult,
+  TestConnectionResult,
 } from "../api/types";
 import { useToast } from "../components/Toast";
 import Button from "../components/Button";
 import Badge from "../components/Badge";
 import Spinner from "../components/Spinner";
+import VpnModal from "../components/VpnModal";
 import DailyCalendar from "./DailyCalendar";
+import { colorForContract, UNASSIGNED_COLOR } from "../lib/colors";
+import { isUnreachableError } from "../lib/errors";
+import { useLogHours, type RowState } from "../state/LogHoursContext";
 import {
   startOfWeek,
   addDays,
@@ -20,12 +25,6 @@ import {
   formatHours,
   formatWeekRange,
 } from "../lib/dates";
-
-interface RowState {
-  contractId: number | null;
-  approved: boolean;
-  description: string;
-}
 
 const rowKey = (p: ProposedEntry) => `${p.event.uid}|${p.event.start}`;
 
@@ -94,36 +93,86 @@ function IndeterminateCheckbox({
 export default function DailyView() {
   const toast = useToast();
 
-  const today = useMemo(() => {
-    const d = new Date();
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, "0");
-    const day = String(d.getDate()).padStart(2, "0");
-    return `${y}-${m}-${day}`;
-  }, []);
-  const [fromDate, setFromDate] = useState(today);
-  const [toDate, setToDate] = useState(today);
-  const [calendarWeekStart, setCalendarWeekStart] = useState(() =>
-    startOfWeek(new Date()),
-  );
+  // Persistent state lives above the router so it survives tab switches.
+  const {
+    fromDate,
+    setFromDate,
+    toDate,
+    setToDate,
+    view,
+    setView,
+    proposals,
+    setProposals,
+    rows,
+    setRows,
+    results,
+    setResults,
+    calendarWeekStart,
+    setCalendarWeekStart,
+    hasFetched,
+    setHasFetched,
+  } = useLogHours();
 
-  const [proposals, setProposals] = useState<ProposedEntry[]>([]);
+  // Transient/derived state stays local: re-fetched cheaply on mount and never
+  // needs to survive navigation.
   const [contracts, setContracts] = useState<OdooRef[]>([]);
-  const [rows, setRows] = useState<Record<string, RowState>>({});
-  const [results, setResults] = useState<Record<string, PushResult>>({});
   const [colors, setColors] = useState<Record<string, string>>({});
 
-  const [view, setView] = useState<"list" | "calendar">("list");
   const [loading, setLoading] = useState(false);
   const [pushing, setPushing] = useState(false);
-  const [hasFetched, setHasFetched] = useState(false);
+
+  // Connection test + VPN-unreachable modal.
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<TestConnectionResult | null>(
+    null,
+  );
+  const [vpnOpen, setVpnOpen] = useState(false);
+
+  // Which row's action menu is currently open (only one at a time).
+  const [openMenuKey, setOpenMenuKey] = useState<string | null>(null);
+
+  // Close the open menu on outside click or Escape.
+  useEffect(() => {
+    if (openMenuKey === null) return;
+
+    function handleMouseDown(e: MouseEvent) {
+      const target = e.target as Node;
+      const menu = document.querySelector(`[data-row-menu="${openMenuKey}"]`);
+      const trigger = document.querySelector(`[data-row-trigger="${openMenuKey}"]`);
+      if (
+        menu && !menu.contains(target) &&
+        trigger && !trigger.contains(target)
+      ) {
+        setOpenMenuKey(null);
+      }
+    }
+
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") setOpenMenuKey(null);
+    }
+
+    document.addEventListener("mousedown", handleMouseDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handleMouseDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [openMenuKey]);
+
+  /** Load contracts for the dropdowns; open the VPN modal if Odoo is down. */
+  function loadContracts() {
+    return api
+      .contracts()
+      .then(setContracts)
+      .catch((e) => {
+        if (isUnreachableError(e)) setVpnOpen(true);
+        toast.error(`Failed to load contracts: ${String(e)}`);
+      });
+  }
 
   // Load contracts once for the dropdowns.
   useEffect(() => {
-    api
-      .contracts()
-      .then(setContracts)
-      .catch((e) => toast.error(`Failed to load contracts: ${String(e)}`));
+    loadContracts();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -155,6 +204,44 @@ export default function DailyView() {
     }
   }
 
+  /** Run the backend connection test; surface VPN modal if Odoo is unreachable. */
+  async function runTest() {
+    setTesting(true);
+    try {
+      const data = await api.testConnection();
+      setTestResult(data);
+      if (data.odoo_unreachable) {
+        setVpnOpen(true);
+      }
+      return data;
+    } catch (e) {
+      const failed: TestConnectionResult = {
+        odoo: false,
+        calendar: false,
+        odoo_unreachable: isUnreachableError(e),
+        errors: { odoo: String(e), calendar: String(e) },
+      };
+      setTestResult(failed);
+      if (failed.odoo_unreachable) setVpnOpen(true);
+      else toast.error(`Connection test failed: ${String(e)}`);
+      return failed;
+    } finally {
+      setTesting(false);
+    }
+  }
+
+  /**
+   * VPN modal "Retry": re-run the connection test and re-fetch contracts.
+   * Close the modal if Odoo is now reachable.
+   */
+  async function handleRetry() {
+    const data = await runTest();
+    if (!data.odoo_unreachable && data.odoo) {
+      setVpnOpen(false);
+      await loadContracts();
+    }
+  }
+
   async function refresh() {
     const rangeStart = fromDate;
     const rangeEnd = toDate;
@@ -179,6 +266,7 @@ export default function DailyView() {
       }
       setRows(init);
     } catch (e) {
+      if (isUnreachableError(e)) setVpnOpen(true);
       toast.error(`Failed to fetch calendar: ${String(e)}`);
     } finally {
       setLoading(false);
@@ -205,6 +293,17 @@ export default function DailyView() {
   function onContractChange(p: ProposedEntry, value: string) {
     const contractId = value ? Number(value) : null;
     setRow(rowKey(p), { contractId });
+  }
+
+  /** Remove a single proposal from the loaded set (persists across tab switches until next Refresh). */
+  function removeProposal(p: ProposedEntry) {
+    const k = rowKey(p);
+    setProposals((prev) => prev.filter((x) => rowKey(x) !== k));
+    setRows((prev) => {
+      const next = { ...prev };
+      delete next[k];
+      return next;
+    });
   }
 
   const approvedEntries: PushEntry[] = useMemo(
@@ -295,13 +394,41 @@ export default function DailyView() {
     [proposals, rows],
   );
 
+  // Per-contract hours across the loaded range, computed client-side from the
+  // current proposals + row selections. Updates as contracts are reassigned.
+  const contractSummary = useMemo(() => {
+    const contractNames = new Map<number, string>();
+    for (const c of contracts) contractNames.set(c.id, c.name);
+
+    const totals = new Map<
+      string,
+      { cid: number | null; name: string; hours: number }
+    >();
+    for (const p of proposals) {
+      const cid = rows[rowKey(p)]?.contractId ?? p.match.contract_id ?? null;
+      const key = cid == null ? "unassigned" : String(cid);
+      const name =
+        cid == null
+          ? "Unassigned"
+          : contractNames.get(cid) ?? p.match.contract_name ?? `Contract ${cid}`;
+      const existing = totals.get(key);
+      if (existing) existing.hours += p.event.hours;
+      else totals.set(key, { cid, name, hours: p.event.hours });
+    }
+
+    const rowsOut = [...totals.values()].sort((a, b) => b.hours - a.hours);
+    const total = rowsOut.reduce((s, r) => s + r.hours, 0);
+    const max = rowsOut.reduce((m, r) => Math.max(m, r.hours), 0);
+    return { rows: rowsOut, total, max };
+  }, [proposals, rows, contracts]);
+
   const approvedCount = approvedEntries.length;
 
   return (
     <div className="page">
       <header className="page__header">
         <div>
-          <h1 className="page__title">Daily hours</h1>
+          <h1 className="page__title">Log Hours</h1>
           <p className="page__subtitle">
             Review calendar events, map them to Odoo contracts, and push approved
             entries.
@@ -371,6 +498,50 @@ export default function DailyView() {
               {!loading && <RefreshCw size={16} aria-hidden="true" />}
               Refresh from calendar
             </Button>
+            <Button
+              variant="secondary"
+              onClick={runTest}
+              loading={testing}
+              disabled={testing}
+            >
+              {!testing && <PlugZap size={16} aria-hidden="true" />}
+              Test connection
+            </Button>
+            {testResult && (
+              <div
+                className="conn-row__status"
+                style={{ gap: "var(--space-3)", flexWrap: "wrap" }}
+                aria-live="polite"
+              >
+                <span style={{ display: "inline-flex", alignItems: "center", gap: "var(--space-1)" }}>
+                  Odoo
+                  <Badge variant={testResult.odoo ? "active" : "inactive"}>
+                    {testResult.odoo ? (
+                      <Check size={12} aria-hidden="true" />
+                    ) : (
+                      <X size={12} aria-hidden="true" />
+                    )}
+                    {testResult.odoo ? "OK" : "Down"}
+                  </Badge>
+                </span>
+                <span style={{ display: "inline-flex", alignItems: "center", gap: "var(--space-1)" }}>
+                  Google Calendar
+                  <Badge variant={testResult.calendar ? "active" : "inactive"}>
+                    {testResult.calendar ? (
+                      <Check size={12} aria-hidden="true" />
+                    ) : (
+                      <X size={12} aria-hidden="true" />
+                    )}
+                    {testResult.calendar ? "OK" : "Down"}
+                  </Badge>
+                </span>
+                {(testResult.errors.odoo || testResult.errors.calendar) && (
+                  <p className="conn-error" style={{ margin: 0, flexBasis: "100%" }}>
+                    {testResult.errors.odoo || testResult.errors.calendar}
+                  </p>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -433,6 +604,86 @@ export default function DailyView() {
             rows selected
           </span>
         </div>
+      )}
+
+      {!loading && view === "list" && proposals.length > 0 && (
+        <section className="card" aria-label="Hours per contract">
+          <div className="card__head">
+            <h3>Hours per contract</h3>
+            <span className="day-group__meta">for the loaded range</span>
+          </div>
+          <div className="card__pad contract-summary">
+            <div className="table-wrap">
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Contract</th>
+                    <th className="num" style={{ width: 96 }}>
+                      Hours
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {contractSummary.rows.map((r) => (
+                    <tr key={r.cid == null ? "unassigned" : r.cid}>
+                      <td>
+                        <span className="contract-cell">
+                          <span
+                            className="contract-bar-swatch"
+                            style={{ background: colorForContract(r.cid, colors) }}
+                            aria-hidden="true"
+                          />
+                          {r.name}
+                        </span>
+                      </td>
+                      <td className="num">{formatHours(r.hours)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr>
+                    <td>Total</td>
+                    <td className="num">{formatHours(contractSummary.total)}</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+
+            <div className="bars">
+              {contractSummary.rows.map((r) => {
+                const pct =
+                  contractSummary.max > 0
+                    ? (r.hours / contractSummary.max) * 100
+                    : 0;
+                return (
+                  <div
+                    className="bar-row"
+                    key={r.cid == null ? "unassigned" : r.cid}
+                  >
+                    <span className="bar-row__label" title={r.name}>
+                      {r.name}
+                    </span>
+                    <span className="bar-row__track">
+                      <span
+                        className="bar-row__fill"
+                        style={{
+                          width: `${pct}%`,
+                          background: colorForContract(r.cid, colors),
+                        }}
+                      />
+                      <span
+                        className="bar-row__value num"
+                        style={{ left: `calc(${pct}% + ${pct > 80 ? "-48px" : "8px"})` }}
+                      >
+                        {formatHours(r.hours)}
+                      </span>
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </section>
       )}
 
       {!loading &&
@@ -516,6 +767,7 @@ export default function DailyView() {
                             <th style={{ width: 90 }} className="text-right">
                               Approve
                             </th>
+                            <th style={{ width: 36 }} aria-label="Row actions" />
                           </tr>
                         </thead>
                         <tbody>
@@ -538,23 +790,54 @@ export default function DailyView() {
                                   {formatHours(p.event.hours)}
                                 </td>
                                 <td>
-                                  <select
-                                    className="select select--cell"
-                                    title={`Contract for ${p.event.title}`}
-                                    aria-label={`Contract for ${p.event.title}`}
-                                    value={r?.contractId ?? ""}
-                                    disabled={p.already_logged}
-                                    onChange={(e) =>
-                                      onContractChange(p, e.target.value)
-                                    }
-                                  >
-                                    <option value="">— Select contract —</option>
-                                    {contracts.map((c) => (
-                                      <option key={c.id} value={c.id}>
-                                        {c.name}
-                                      </option>
-                                    ))}
-                                  </select>
+                                  <div className="contract-pick">
+                                    {(() => {
+                                      const cid =
+                                        rows[key]?.contractId ??
+                                        p.match.contract_id ??
+                                        null;
+                                      if (cid == null) {
+                                        return (
+                                          <span
+                                            className="contract-dot contract-dot--empty"
+                                            style={{
+                                              background: UNASSIGNED_COLOR,
+                                            }}
+                                            aria-hidden="true"
+                                          />
+                                        );
+                                      }
+                                      return (
+                                        <input
+                                          type="color"
+                                          className="contract-dot contract-dot--input"
+                                          aria-label={`Color for contract of ${p.event.title}`}
+                                          title="Contract color"
+                                          value={colorForContract(cid, colors)}
+                                          onChange={(e) =>
+                                            handleSetColor(cid, e.target.value)
+                                          }
+                                        />
+                                      );
+                                    })()}
+                                    <select
+                                      className="select select--cell"
+                                      title={`Contract for ${p.event.title}`}
+                                      aria-label={`Contract for ${p.event.title}`}
+                                      value={r?.contractId ?? ""}
+                                      disabled={p.already_logged}
+                                      onChange={(e) =>
+                                        onContractChange(p, e.target.value)
+                                      }
+                                    >
+                                      <option value="">— Select contract —</option>
+                                      {contracts.map((c) => (
+                                        <option key={c.id} value={c.id}>
+                                          {c.name}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  </div>
                                 </td>
                                 <td className="cell-description">
                                   <input
@@ -622,6 +905,45 @@ export default function DailyView() {
                                     }
                                   />
                                 </td>
+                                <td className="row-actions-cell">
+                                  <div className="row-actions-wrap">
+                                    <button
+                                      type="button"
+                                      className="row-menu-trigger"
+                                      aria-haspopup="menu"
+                                      aria-expanded={openMenuKey === key}
+                                      aria-label={`Row actions for "${p.event.title}"`}
+                                      data-row-trigger={key}
+                                      onClick={() =>
+                                        setOpenMenuKey((prev) =>
+                                          prev === key ? null : key,
+                                        )
+                                      }
+                                    >
+                                      <MoreVertical size={14} aria-hidden="true" />
+                                    </button>
+                                    {openMenuKey === key && (
+                                      <div
+                                        className="row-menu"
+                                        role="menu"
+                                        data-row-menu={key}
+                                      >
+                                        <button
+                                          type="button"
+                                          className="row-menu__item"
+                                          role="menuitem"
+                                          onClick={() => {
+                                            removeProposal(p);
+                                            setOpenMenuKey(null);
+                                          }}
+                                        >
+                                          <Trash2 size={13} aria-hidden="true" />
+                                          Remove from import
+                                        </button>
+                                      </div>
+                                    )}
+                                  </div>
+                                </td>
                               </tr>
                             );
                           })}
@@ -652,6 +974,13 @@ export default function DailyView() {
           </Button>
         </div>
       )}
+
+      <VpnModal
+        open={vpnOpen}
+        retrying={testing}
+        onRetry={handleRetry}
+        onClose={() => setVpnOpen(false)}
+      />
     </div>
   );
 }

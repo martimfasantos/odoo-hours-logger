@@ -1,5 +1,6 @@
 import type {
-  ContractTotal, OdooRef, ProposedEntry, PushEntry, PushResult, Rule, RuleCreate,
+  ConfigValues, ContractTotal, OdooRef, OverviewResponse, ProposedEntry, PushEntry, PushResult,
+  Rule, RuleCreate, TestConnectionResult,
 } from "./types";
 
 async function req<T>(url: string, options?: RequestInit): Promise<T> {
@@ -24,6 +25,8 @@ export const api = {
     req<Record<string, ProposedEntry[]>>(`/api/timesheet/daily?start=${start}&end=${end}`),
   weekly: (start: string, end: string) =>
     req<ContractTotal[]>(`/api/timesheet/weekly?start=${start}&end=${end}`),
+  overview: (start: string, end: string) =>
+    req<OverviewResponse>(`/api/overview?start=${start}&end=${end}`),
   listRules: () => req<Rule[]>("/api/rules"),
   createRule: (data: RuleCreate) =>
     req<Rule>("/api/rules", { method: "POST", body: JSON.stringify(data) }),
@@ -41,9 +44,12 @@ export const api = {
       method: "PUT", body: JSON.stringify({ color }),
     }),
   testConnection: () =>
-    req<{ odoo: boolean; calendar: boolean; errors: Record<string, string> }>(
+    req<TestConnectionResult>(
       "/api/settings/test-connection", { method: "POST" }),
   getIgnoreKeywords: () => req<string[]>("/api/ignore"),
   setIgnoreKeywords: (keywords: string[]) =>
     req<string[]>("/api/ignore", { method: "PUT", body: JSON.stringify({ keywords }) }),
+  getConfig: () => req<ConfigValues>("/api/config"),
+  saveConfig: (values: Partial<ConfigValues>) =>
+    req<ConfigValues>("/api/config", { method: "PUT", body: JSON.stringify(values) }),
 };

@@ -73,6 +73,46 @@ export function formatWeekRange(weekStartISO: string): string {
   return `${startLabel} - ${endLabel}`;
 }
 
+/** First day of the month containing `d`, as a YYYY-MM-DD string. */
+export function startOfMonth(d: Date): string {
+  return toISODate(new Date(d.getFullYear(), d.getMonth(), 1));
+}
+
+/** Last day of the month containing `d`, as a YYYY-MM-DD string. */
+export function endOfMonth(d: Date): string {
+  return toISODate(new Date(d.getFullYear(), d.getMonth() + 1, 0));
+}
+
+/** Add `n` months to the month containing the YYYY-MM-DD `iso`, returning its 1st. */
+export function addMonths(iso: string, n: number): string {
+  const d = new Date(`${iso}T00:00:00`);
+  return startOfMonth(new Date(d.getFullYear(), d.getMonth() + n, 1));
+}
+
+/**
+ * Range label from two YYYY-MM-DD strings, e.g. "Jun 1 – Jun 14, 2026".
+ * Collapses repeated month/year between the two ends.
+ */
+export function formatDateRange(startISO: string, endISO: string): string {
+  const start = new Date(`${startISO}T00:00:00`);
+  const end = new Date(`${endISO}T00:00:00`);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+    return `${startISO} – ${endISO}`;
+  }
+  const sameYear = start.getFullYear() === end.getFullYear();
+  const startLabel = start.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    ...(sameYear ? {} : { year: "numeric" }),
+  });
+  const endLabel = end.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+  return `${startLabel} – ${endLabel}`;
+}
+
 /** Local decimal hour-of-day for an ISO datetime, e.g. 09:30 -> 9.5. */
 export function decimalHour(iso: string): number {
   const d = new Date(iso);

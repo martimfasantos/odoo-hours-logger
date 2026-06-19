@@ -1,18 +1,18 @@
 import { useEffect, useRef, useState } from "react";
-import { Plus, Pencil, Trash2, X } from "lucide-react";
+import { Plus, Pencil, Trash2, X, Check } from "lucide-react";
 import { api } from "../api/client";
 import type { OdooRef, Rule, RuleCreate } from "../api/types";
 import { useToast } from "../components/Toast";
 import Button from "../components/Button";
 import Badge from "../components/Badge";
 import Spinner from "../components/Spinner";
+import { PALETTE, colorForContract } from "../lib/colors";
 
 interface FormState {
   name: string;
   keywords: string;
   contract_id: number | null;
   contract_name: string;
-  priority: number;
   active: boolean;
 }
 
@@ -27,7 +27,6 @@ const EMPTY_FORM: FormState = {
   keywords: "",
   contract_id: null,
   contract_name: "",
-  priority: 100,
   active: true,
 };
 
@@ -36,6 +35,7 @@ export default function MappingRules() {
 
   const [rules, setRules] = useState<Rule[]>([]);
   const [contracts, setContracts] = useState<OdooRef[]>([]);
+  const [colors, setColors] = useState<Record<string, string>>({});
   const [loadingRules, setLoadingRules] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [deletingId, setDeletingId] = useState<number | null>(null);
@@ -60,6 +60,10 @@ export default function MappingRules() {
       .getIgnoreKeywords()
       .then(setIgnoreKeywords)
       .catch((e) => toast.error(`Failed to load filter words: ${String(e)}`));
+    api
+      .getColors()
+      .then(setColors)
+      .catch(() => setColors({}));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -82,6 +86,24 @@ export default function MappingRules() {
       contract_id: contract ? contract.id : null,
       contract_name: contract ? contract.name : "",
     }));
+  }
+
+  async function handleSetColor(contractId: number, hex: string) {
+    const key = String(contractId);
+    const prev = colors[key];
+    setColors((c) => ({ ...c, [key]: hex }));
+    try {
+      const updated = await api.setColor(contractId, hex);
+      setColors(updated);
+    } catch (e) {
+      setColors((c) => {
+        const next = { ...c };
+        if (prev === undefined) delete next[key];
+        else next[key] = prev;
+        return next;
+      });
+      toast.error(`Failed to save color: ${String(e)}`);
+    }
   }
 
   function validate(): boolean {
@@ -107,7 +129,6 @@ export default function MappingRules() {
       keywords: kws,
       contract_id: form.contract_id!,
       contract_name: form.contract_name,
-      priority: form.priority,
       active: form.active,
     };
   }
@@ -141,7 +162,6 @@ export default function MappingRules() {
       keywords: rule.keywords.join(", "),
       contract_id: rule.contract_id,
       contract_name: rule.contract_name,
-      priority: rule.priority,
       active: rule.active,
     });
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -213,73 +233,6 @@ export default function MappingRules() {
           </p>
         </div>
       </header>
-
-      {/* Filter words card */}
-      <section className="card" aria-label="Filter words">
-        <div className="card__head">
-          <h3>Filter words</h3>
-          {savingIgnore && <Spinner />}
-        </div>
-        <div className="card__pad">
-          <p className="page__subtitle" style={{ marginBottom: "var(--space-4)" }}>
-            Calendar events whose title contains any of these words are skipped on
-            import (e.g. &ldquo;Out of Office&rdquo;, &ldquo;Lunch&rdquo;).
-          </p>
-
-          {ignoreKeywords.length > 0 && (
-            <div className="filter-words__chips" style={{ marginBottom: "var(--space-4)" }}>
-              {ignoreKeywords.map((word) => (
-                <span key={word} className="filter-chip">
-                  <span className="filter-chip__label">{word}</span>
-                  <button
-                    type="button"
-                    className="filter-chip__remove"
-                    aria-label={`Remove filter word "${word}"`}
-                    disabled={savingIgnore}
-                    onClick={() => handleRemoveWord(word)}
-                  >
-                    <X size={12} aria-hidden="true" />
-                  </button>
-                </span>
-              ))}
-            </div>
-          )}
-
-          <div className="filter-words__add">
-            <label className="field__label" htmlFor="filter-word-input">
-              Add a word
-            </label>
-            <div className="filter-words__row">
-              <input
-                id="filter-word-input"
-                ref={newWordInputRef}
-                type="text"
-                className="input"
-                value={newWord}
-                placeholder="e.g. Out of Office"
-                disabled={savingIgnore}
-                onChange={(e) => setNewWord(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    void handleAddWord();
-                  }
-                }}
-              />
-              <Button
-                variant="primary"
-                size="sm"
-                disabled={savingIgnore || !newWord.trim()}
-                loading={savingIgnore}
-                onClick={() => void handleAddWord()}
-              >
-                {!savingIgnore && <Plus size={14} aria-hidden="true" />}
-                Add
-              </Button>
-            </div>
-          </div>
-        </div>
-      </section>
 
       {/* Form card */}
       <section className="card" aria-label={editId !== null ? "Edit rule" : "Create rule"}>
@@ -368,21 +321,47 @@ export default function MappingRules() {
                 )}
               </div>
 
-              {/* Priority */}
-              <div className="field">
-                <label className="field__label" htmlFor="rule-priority">
-                  Priority
-                </label>
-                <input
-                  id="rule-priority"
-                  type="number"
-                  className="input"
-                  value={form.priority}
-                  min={1}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, priority: Number(e.target.value) }))
-                  }
-                />
+              {/* Color */}
+              <div className="field field--full">
+                <label className="field__label">Color</label>
+                {form.contract_id == null ? (
+                  <p className="field__hint">Select a contract first</p>
+                ) : (
+                  <div className="color-palette" role="group" aria-label="Contract color palette">
+                    {PALETTE.map((hex) => {
+                      const isSelected =
+                        colorForContract(form.contract_id, colors) === hex;
+                      return (
+                        <button
+                          key={hex}
+                          type="button"
+                          className={`color-swatch${isSelected ? " color-swatch--selected" : ""}`}
+                          style={{ background: hex }}
+                          aria-label={`Set color ${hex}`}
+                          aria-pressed={isSelected}
+                          onClick={() => handleSetColor(form.contract_id!, hex)}
+                        >
+                          {isSelected && (
+                            <Check size={10} aria-hidden="true" className="color-swatch__check" />
+                          )}
+                        </button>
+                      );
+                    })}
+                    <label className="color-swatch color-swatch--custom" aria-label="Custom color">
+                      <span className="sr-only">Custom color</span>
+                      <input
+                        type="color"
+                        className="color-swatch__input"
+                        value={colorForContract(form.contract_id, colors)}
+                        onChange={(e) =>
+                          handleSetColor(form.contract_id!, e.target.value)
+                        }
+                        aria-label="Custom color"
+                        title="Pick a custom color"
+                      />
+                    </label>
+                  </div>
+                )}
               </div>
 
               {/* Active */}
@@ -423,6 +402,73 @@ export default function MappingRules() {
         </div>
       </section>
 
+      {/* Filter words card */}
+      <section className="card" aria-label="Filter words">
+        <div className="card__head">
+          <h3>Filter words</h3>
+          {savingIgnore && <Spinner />}
+        </div>
+        <div className="card__pad">
+          <p className="page__subtitle" style={{ marginBottom: "var(--space-4)" }}>
+            Calendar events whose title contains any of these words are skipped on
+            import (e.g. &ldquo;Out of Office&rdquo;, &ldquo;Lunch&rdquo;).
+          </p>
+
+          {ignoreKeywords.length > 0 && (
+            <div className="filter-words__chips" style={{ marginBottom: "var(--space-4)" }}>
+              {ignoreKeywords.map((word) => (
+                <span key={word} className="filter-chip">
+                  <span className="filter-chip__label">{word}</span>
+                  <button
+                    type="button"
+                    className="filter-chip__remove"
+                    aria-label={`Remove filter word "${word}"`}
+                    disabled={savingIgnore}
+                    onClick={() => handleRemoveWord(word)}
+                  >
+                    <X size={12} aria-hidden="true" />
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
+
+          <div className="filter-words__add">
+            <label className="field__label" htmlFor="filter-word-input">
+              Add a word
+            </label>
+            <div className="filter-words__row">
+              <input
+                id="filter-word-input"
+                ref={newWordInputRef}
+                type="text"
+                className="input"
+                value={newWord}
+                placeholder="e.g. Out of Office"
+                disabled={savingIgnore}
+                onChange={(e) => setNewWord(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    void handleAddWord();
+                  }
+                }}
+              />
+              <Button
+                variant="primary"
+                size="sm"
+                disabled={savingIgnore || !newWord.trim()}
+                loading={savingIgnore}
+                onClick={() => void handleAddWord()}
+              >
+                {!savingIgnore && <Plus size={14} aria-hidden="true" />}
+                Add
+              </Button>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Rules table */}
       <section className="card" aria-label="Rules list">
         <div className="card__head">
@@ -444,7 +490,6 @@ export default function MappingRules() {
                   <th>Name</th>
                   <th>Keywords</th>
                   <th>Contract</th>
-                  <th className="num" style={{ width: 80 }}>Priority</th>
                   <th style={{ width: 90 }}>Status</th>
                   <th style={{ width: 120 }}>Actions</th>
                 </tr>
@@ -461,7 +506,6 @@ export default function MappingRules() {
                       </div>
                     </td>
                     <td>{rule.contract_name}</td>
-                    <td className="num">{rule.priority}</td>
                     <td>
                       <Badge variant={rule.active ? "active" : "inactive"}>
                         {rule.active ? "Active" : "Inactive"}
