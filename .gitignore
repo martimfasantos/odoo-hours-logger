@@ -19,3 +19,9 @@ dist/
 .DS_Store
 .idea/
 .vscode/
+
+# Desktop app build artifacts
+/dist-app/
+/build-app/
+/packaging/AppIcon.icns
+*.iconset
