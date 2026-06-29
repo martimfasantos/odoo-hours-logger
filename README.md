@@ -86,6 +86,36 @@ are demo mode.
 > expires, and you re-paste it in the Settings tab). Full variable reference and the technical
 > details are in **[`docs/GUIDE.md`](docs/GUIDE.md)**.
 
+## 🖥️ Desktop app (macOS)
+
+Build a standalone `Odoo Hours Logger.app` you can keep in `/Applications` and
+launch like any other app — no terminal, no repo needed at runtime.
+
+### Build
+
+```bash
+./build_app.sh
+```
+
+This builds the frontend, bundles the Python backend + UI with PyInstaller, and
+produces `dist-app/Odoo Hours Logger.app`. Optional: `brew install librsvg` for
+a custom app icon (otherwise the default icon is used).
+
+On the first build your existing `backend/.env` and `backend/data/` are copied
+once into `~/Library/Application Support/Odoo Hours Logger/`, which is where the
+installed app reads and writes its config and data thereafter.
+
+### First launch
+
+The app is unsigned, so the first time, **right-click it → Open** and confirm
+(Gatekeeper warns once). After that, double-click as usual. The company VPN is
+still required to reach Odoo.
+
+### Development
+
+Packaging changes nothing about development — keep using `./run.sh` (FastAPI on
+:8010 + Vite on :5173).
+
 ## 🧭 How it works
 
 1. **Import** — pick a date range, _Refresh from calendar_; events are fetched from the iCal URL and parsed.
