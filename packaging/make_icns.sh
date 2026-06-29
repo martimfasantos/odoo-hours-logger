@@ -8,6 +8,7 @@ SVG="$ROOT/frontend/public/favicon.svg"
 OUT="$ROOT/packaging/AppIcon.icns"
 TMPSET="$(mktemp -d)/AppIcon.iconset"
 mkdir -p "$TMPSET"
+trap 'rm -rf "$(dirname "$TMPSET")"' EXIT
 
 if ! command -v rsvg-convert >/dev/null 2>&1; then
   echo "make_icns: rsvg-convert not found (brew install librsvg); skipping icon."

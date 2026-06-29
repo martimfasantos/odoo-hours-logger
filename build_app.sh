@@ -21,8 +21,16 @@ echo "3/4  Building .app with PyInstaller…"
 echo "4/4  Seeding config to App Support (first build only)…"
 if [ ! -f "$APP_SUPPORT/.env" ]; then
   mkdir -p "$APP_SUPPORT"
-  [ -f "$ROOT/backend/.env" ] && cp "$ROOT/backend/.env" "$APP_SUPPORT/.env" && echo "      copied .env"
-  [ -d "$ROOT/backend/data" ] && cp -R "$ROOT/backend/data" "$APP_SUPPORT/data" && echo "      copied data/"
+  if [ -f "$ROOT/backend/.env" ]; then
+    cp "$ROOT/backend/.env" "$APP_SUPPORT/.env" && echo "      copied .env"
+  else
+    echo "      WARNING: backend/.env not found; not seeded. Configure the app on first launch via Settings."
+  fi
+  if [ -d "$ROOT/backend/data" ]; then
+    cp -R "$ROOT/backend/data" "$APP_SUPPORT/data" && echo "      copied data/"
+  else
+    echo "      note: backend/data/ not found; starting with empty data."
+  fi
 else
   echo "      App Support config already exists; left untouched."
 fi
