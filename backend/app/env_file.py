@@ -1,8 +1,8 @@
-from pathlib import Path
+from app.paths import app_data_dir
 
-# backend/.env — the file pydantic-settings reads when the server runs with cwd=backend.
-# Kept as a module-level variable so tests can monkeypatch it.
-ENV_PATH = Path(__file__).resolve().parent.parent / ".env"
+# The .env file pydantic-settings reads. Resolves to backend/.env in dev and to
+# the App Support dir when bundled. Module-level so tests can monkeypatch it.
+ENV_PATH = app_data_dir() / ".env"
 
 
 def read_env() -> dict[str, str]:

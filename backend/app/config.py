@@ -4,9 +4,11 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from app.paths import app_data_dir
+
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(env_file=str(app_data_dir() / ".env"), extra="ignore")
 
     GOOGLE_CALENDAR_URL: str = ""
     ODOO_URL: str = ""
@@ -22,7 +24,7 @@ class Settings(BaseSettings):
     ODOO_NETWORK_MEMBER_ID: int | None = None
     LOCAL_TZ: str = "Europe/Lisbon"
     USER_EMAIL: str = ""
-    DATA_DIR: str = "data"
+    DATA_DIR: str = str(app_data_dir() / "data")
     DEMO_MODE: bool = False
 
     @field_validator("LOCAL_TZ")

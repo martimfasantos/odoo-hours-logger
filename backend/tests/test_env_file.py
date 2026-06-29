@@ -91,3 +91,10 @@ def test_read_write_roundtrip(tmp_path, monkeypatch):
 
     assert updated["KEY_A"] == "updated"
     assert updated["KEY_B"] == original["KEY_B"]
+
+
+def test_env_path_resolves_under_app_data_dir():
+    from app import env_file
+    from app.paths import app_data_dir
+
+    assert env_file.ENV_PATH == app_data_dir() / ".env"

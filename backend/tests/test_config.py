@@ -38,3 +38,12 @@ def test_local_tz_defaults_to_lisbon():
 def test_invalid_local_tz_raises():
     with pytest.raises(ValidationError):
         Settings(**_REQUIRED, LOCAL_TZ="Not/AZone")
+
+
+def test_data_dir_default_resolves_under_app_data_dir():
+    from app.config import Settings
+    from app.paths import app_data_dir
+
+    # _env_file=None avoids reading a real backend/.env that could set DATA_DIR.
+    s = Settings(_env_file=None)
+    assert s.DATA_DIR == str(app_data_dir() / "data")
