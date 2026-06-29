@@ -1301,6 +1301,14 @@ tr:hover .row-menu-trigger {
   white-space: nowrap;
 }
 
+/* The last row in a day table has no content below it, so a downward-opening
+   menu gets clipped by `.table-wrap`'s overflow (overflow-x:auto forces the
+   y-axis to clip too). Open it upward instead so it stays fully visible. */
+tr:last-child .row-menu {
+  top: auto;
+  bottom: calc(100% + 4px);
+}
+
 /* Menu item */
 .row-menu__item {
   display: flex;

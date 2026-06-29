@@ -29,6 +29,29 @@ import {
 const rowKey = (p: ProposedEntry) => `${p.event.uid}|${p.event.start}`;
 
 /**
+ * Recompute the `overlaps` flag for a set of proposals using the same
+ * interval-intersection rule as the backend (two events overlap when
+ * `a.start < b.end && b.start < a.end`). Called after a proposal is removed so
+ * the remaining rows' "Overlap" badges reflect the new set: deleting the event
+ * that linked two others clears their badges, while events that still overlap
+ * something keep theirs. Returns the same array reference-wise for unchanged
+ * rows so React can skip re-rendering them.
+ */
+export function recomputeOverlaps(entries: ProposedEntry[]): ProposedEntry[] {
+  const spans = entries.map((p) => ({
+    start: new Date(p.event.start).getTime(),
+    end: new Date(p.event.end).getTime(),
+  }));
+  return entries.map((p, i) => {
+    const a = spans[i];
+    const overlaps = spans.some(
+      (b, j) => j !== i && b.start < a.end && a.start < b.end,
+    );
+    return p.overlaps === overlaps ? p : { ...p, overlaps };
+  });
+}
+
+/**
  * Approve-all summary for an arbitrary set of proposals. `approvable` excludes
  * already-logged rows (those cannot be approved). The group checkbox is checked
  * when every approvable row is approved, unchecked when none are, and
@@ -298,7 +321,11 @@ export default function DailyView() {
   /** Remove a single proposal from the loaded set (persists across tab switches until next Refresh). */
   function removeProposal(p: ProposedEntry) {
     const k = rowKey(p);
-    setProposals((prev) => prev.filter((x) => rowKey(x) !== k));
+    // Recompute overlaps on the remaining events so neighbours' "Overlap"
+    // badges update (and clear when nothing overlaps them any more).
+    setProposals((prev) =>
+      recomputeOverlaps(prev.filter((x) => rowKey(x) !== k)),
+    );
     setRows((prev) => {
       const next = { ...prev };
       delete next[k];
