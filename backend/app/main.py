@@ -1,4 +1,5 @@
 import logging
+from contextlib import asynccontextmanager
 from datetime import date as Date
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
@@ -25,7 +26,13 @@ from app.schemas import (
     PushEntry, PushResult, Rule, RuleCreate,
 )
 
-app = FastAPI(title="Odoo Hours Logger")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    ensure_app_dirs()
+    yield
+
+
+app = FastAPI(title="Odoo Hours Logger", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -33,11 +40,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-
-@app.on_event("startup")
-def _ensure_dirs_on_startup() -> None:
-    ensure_app_dirs()
 
 
 class PushRequest(BaseModel):
