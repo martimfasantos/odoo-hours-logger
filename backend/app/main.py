@@ -8,6 +8,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from app import demo, deps, env_file
+from app.paths import ensure_app_dirs, frontend_dist_dir
+from app.spa import SPAStaticFiles
 from app.aggregations import weekly_by_contract
 from app.calendar_source import fetch_ical, parse_events
 from app.config import Settings
@@ -31,6 +33,11 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.on_event("startup")
+def _ensure_dirs_on_startup() -> None:
+    ensure_app_dirs()
 
 
 class PushRequest(BaseModel):
@@ -494,3 +501,10 @@ def test_connection(settings: Settings = Depends(deps.settings),
     except Exception as exc:
         result["errors"]["calendar"] = str(exc)
     return result
+
+
+# Serve the built SPA last, so API routes take precedence. Only mounted when a
+# built frontend exists (production / packaged app); in dev Vite serves the UI.
+_dist = frontend_dist_dir()
+if _dist is not None:
+    app.mount("/", SPAStaticFiles(directory=str(_dist), html=True), name="spa")
