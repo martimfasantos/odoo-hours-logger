@@ -91,6 +91,41 @@ are demo mode.
 Build a standalone `Odoo Hours Logger.app` you can keep in `/Applications` and
 launch like any other app — no terminal, no repo needed at runtime.
 
+### Install on your Mac (from a fresh clone)
+
+End-to-end — from nothing to an app sitting in `/Applications`:
+
+```bash
+# 1. Clone
+git clone https://github.com/martimfasantos/odoo-hours-logger.git
+cd odoo-hours-logger
+
+# 2. One-time setup — backend venv + build tools (PyInstaller, pywebview), then frontend deps
+cd backend && python -m venv .venv && . .venv/bin/activate && pip install -e ".[dev,packaging]"
+cd ../frontend && npm install && cd ..
+
+# 3. Configure — your Google Calendar iCal URL + Odoo session_id (or fill these in later in Settings)
+cp backend/.env.example backend/.env   # then edit backend/.env
+
+# 4. (optional) prettier app icon
+brew install librsvg
+
+# 5. Build the .app
+./build_app.sh
+
+# 6. Drop it into /Applications
+mv "dist-app/Odoo Hours Logger.app" /Applications/
+
+# 7. Launch it — first time: right-click in Finder → Open (unsigned, Gatekeeper warns once)
+open "/Applications/Odoo Hours Logger.app"
+```
+
+During the build your `backend/.env` and `backend/data/` are copied once into
+`~/Library/Application Support/Odoo Hours Logger/` — so the installed app is
+already configured on first launch and reads/writes its data there afterwards.
+After pulling new changes, just re-run `./build_app.sh` and copy the rebuilt
+app over; your config in Application Support is left untouched.
+
 ### Build
 
 ```bash
