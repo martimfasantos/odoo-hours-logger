@@ -59,7 +59,7 @@ def main() -> None:
         height=860,
         min_size=(960, 600),
     )
-    webview.start()
+    webview.start()  # blocks until all windows are closed
     server.should_exit = True  # window closed → stop uvicorn
 
 

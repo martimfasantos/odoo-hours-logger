@@ -7,9 +7,8 @@ def test_find_free_port_is_bindable():
     port = desktop.find_free_port()
     assert isinstance(port, int)
     assert 1024 <= port <= 65535
-    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    s.bind(("127.0.0.1", port))  # must be free/bindable
-    s.close()
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.bind(("127.0.0.1", port))  # must be free/bindable
 
 
 def test_wait_for_health_returns_true_when_ok(monkeypatch):
