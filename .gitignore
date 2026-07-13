@@ -25,3 +25,6 @@ dist/
 /build-app/
 /packaging/AppIcon.icns
 *.iconset
+
+# Playwright MCP scratch output (screenshots, snapshots, logs)
+.playwright-mcp/
