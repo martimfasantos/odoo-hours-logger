@@ -277,6 +277,25 @@ export default function Settings() {
             immediately. Update <code>ODOO_SESSION_ID</code> here when your
             session expires.
           </p>
+          <details className="field-reveal__note">
+            <summary style={{ cursor: "pointer", fontWeight: 600 }}>
+              How to get a fresh session ID
+            </summary>
+            <ol style={{ margin: "8px 0 0", paddingLeft: "20px", lineHeight: 1.6 }}>
+              <li>Open Odoo in your browser and log in (VPN on).</li>
+              <li>
+                Open DevTools (<kbd>⌥⌘I</kbd>) → <b>Application</b> →{" "}
+                <b>Cookies</b> → your Odoo domain.
+              </li>
+              <li>
+                Copy the value of the <code>session_id</code> cookie.
+              </li>
+              <li>
+                Paste it into the <b>Odoo Session ID</b> field below, then{" "}
+                <b>Save settings</b>.
+              </li>
+            </ol>
+          </details>
           <form onSubmit={handleSave} noValidate>
             <div className="config-form">
               {MASKED_STRING_FIELDS.map((fieldKey) => {
