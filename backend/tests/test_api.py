@@ -80,6 +80,27 @@ def test_rules_crud_flow(client):
     assert c.get("/api/rules").json() == []
 
 
+def test_analytics_endpoint(client):
+    c, fake_odoo, _ = client
+    fake_odoo.existing_entries.return_value = [
+        {"contract_id": 10, "contract_name": "[10] GreenVolt",
+         "start_time": "2026-06-01 09:00:00", "end_time": "2026-06-01 13:00:00",
+         "work_description": "x", "duration_h": 4.0,
+         "internal_cost": 160.0, "external_cost": 400.0},
+    ]
+    fake_odoo.contract_rates.return_value = {
+        10: {"internal_rate": 40.0, "external_rate": 100.0, "margin": 0.6}}
+    resp = c.get("/api/analytics?start=2026-06-01&end=2026-06-07")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["projects"][0]["contract_id"] == 10
+    assert body["projects"][0]["revenue"] == 400.0
+    assert body["projects"][0]["external_rate"] == 100.0
+    assert body["totals"]["hours"] == 4.0
+    assert body["currency"] == "EUR"
+    assert len(body["weekly"]) >= 1
+
+
 def test_push_creates_entry_and_records_ledger(client):
     c, fake_odoo, lg = client
     entry = {

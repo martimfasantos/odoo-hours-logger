@@ -11,7 +11,7 @@ from pydantic import BaseModel
 from app import demo, deps, env_file
 from app.paths import ensure_app_dirs, frontend_dist_dir
 from app.spa import SPAStaticFiles
-from app.aggregations import weekly_by_contract
+from app.aggregations import build_analytics, weekly_by_contract
 from app.calendar_source import fetch_ical, parse_events
 from app.config import Settings
 from app.ignore import IgnoreStore
@@ -21,8 +21,8 @@ from app.odoo_client import OdooClient, OdooSessionExpired, OdooUnreachable, par
 from app.colors import ColorStore
 from app.rules import RulesStore
 from app.schemas import (
-    CalendarEvent, ColorUpdate, ConfigValues, ContractOverview, ContractTotal, OdooRef,
-    OverviewBlock, OverviewResponse, ProposedEntry,
+    AnalyticsResponse, CalendarEvent, ColorUpdate, ConfigValues, ContractOverview,
+    ContractTotal, OdooRef, OverviewBlock, OverviewResponse, ProposedEntry,
     PushEntry, PushResult, Rule, RuleCreate,
 )
 
@@ -261,6 +261,42 @@ def weekly(start: Date, end: Date,
     proposals = _build_proposals(events, rules.list(), ledger, odoo,
                                  settings.DEMO_MODE)
     return weekly_by_contract(proposals)
+
+
+@app.get("/api/analytics", response_model=AnalyticsResponse)
+def analytics(start: Date, end: Date,
+              settings: Settings = Depends(deps.settings),
+              odoo: OdooClient = Depends(deps.odoo)):
+    if settings.DEMO_MODE:
+        return demo.demo_analytics(start, end, settings.LOCAL_TZ)
+    try:
+        entries_raw = odoo.existing_entries(
+            datetime(start.year, start.month, start.day, tzinfo=timezone.utc),
+            datetime(end.year, end.month, end.day, 23, 59, 59, tzinfo=timezone.utc),
+        )
+    except OdooUnreachable:
+        raise HTTPException(status_code=503,
+                            detail="Could not reach Odoo — check your VPN connection.")
+    except OdooSessionExpired as exc:
+        raise HTTPException(status_code=401, detail=str(exc))
+
+    entries: list[dict] = []
+    for row in entries_raw:
+        st = row.get("start_time")
+        if not st:
+            continue
+        try:
+            local_date = parse_odoo_utc(st, settings.LOCAL_TZ).date()
+        except Exception:
+            continue
+        entries.append({**row, "local_date": local_date})
+
+    contract_ids = {e["contract_id"] for e in entries if e.get("contract_id") is not None}
+    try:
+        rates = odoo.contract_rates(list(contract_ids))
+    except (OdooUnreachable, OdooSessionExpired):
+        rates = {}
+    return build_analytics(entries, rates, start, end)
 
 
 @app.get("/api/overview", response_model=OverviewResponse)

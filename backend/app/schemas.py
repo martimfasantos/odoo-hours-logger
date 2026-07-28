@@ -106,6 +106,39 @@ class OverviewResponse(BaseModel):
     blocks: list[OverviewBlock]
 
 
+class AnalyticsProject(BaseModel):
+    contract_id: int
+    contract_name: str
+    hours: float
+    allocation_pct: float  # 0..100
+    internal_rate: Optional[float] = None
+    external_rate: Optional[float] = None
+    revenue: float  # sum of external_cost
+    cost: float  # sum of internal_cost
+    margin: float  # revenue - cost
+    margin_pct: Optional[float] = None  # margin/revenue*100, None if revenue == 0
+
+
+class AnalyticsWeek(BaseModel):
+    week_start: Date  # Monday
+    hours: float
+
+
+class AnalyticsTotals(BaseModel):
+    hours: float
+    revenue: float
+    cost: float
+    margin: float
+    margin_pct: Optional[float] = None
+
+
+class AnalyticsResponse(BaseModel):
+    projects: list[AnalyticsProject]
+    totals: AnalyticsTotals
+    weekly: list[AnalyticsWeek]
+    currency: str = "EUR"
+
+
 class ConfigValues(BaseModel):
     GOOGLE_CALENDAR_URL: Optional[str] = None
     ODOO_URL: Optional[str] = None

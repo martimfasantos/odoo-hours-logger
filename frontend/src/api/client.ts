@@ -1,6 +1,6 @@
 import type {
-  ConfigValues, ContractTotal, OdooRef, OverviewResponse, ProposedEntry, PushEntry, PushResult,
-  Rule, RuleCreate, TestConnectionResult,
+  AnalyticsResponse, ConfigValues, ContractTotal, OdooRef, OverviewResponse, ProposedEntry,
+  PushEntry, PushResult, Rule, RuleCreate, TestConnectionResult,
 } from "./types";
 
 async function req<T>(url: string, options?: RequestInit): Promise<T> {
@@ -52,4 +52,6 @@ export const api = {
   getConfig: () => req<ConfigValues>("/api/config"),
   saveConfig: (values: Partial<ConfigValues>) =>
     req<ConfigValues>("/api/config", { method: "PUT", body: JSON.stringify(values) }),
+  analytics: (start: string, end: string) =>
+    req<AnalyticsResponse>(`/api/analytics?start=${start}&end=${end}`),
 };
