@@ -11,7 +11,7 @@
 ![React](https://img.shields.io/badge/React-61DAFB?logo=react&logoColor=black)
 ![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white)
 ![Vite](https://img.shields.io/badge/Vite-646CFF?logo=vite&logoColor=white)
-![tests](https://img.shields.io/badge/tests-221%20passing-2ea44f)
+![tests](https://img.shields.io/badge/tests-243%20passing-2ea44f)
 ![database](https://img.shields.io/badge/database-none-lightgrey)
 
 </div>
@@ -36,7 +36,7 @@
 - 🧹 **Filter words** to skip non-work events (e.g. _"Out of Office"_, _"Lunch"_).
 - ⚙️ **Editable, masked settings** saved to `.env` — re-paste your Odoo session here when it expires.
 - 🔌 **Session-cookie Odoo auth** (no API key needed) with a clear **"check your VPN"** prompt when Odoo is unreachable.
-- 🧪 **Demo mode** + a full test suite (**111** backend, **110** frontend).
+- 🧪 **Demo mode** + a full test suite (**127** backend, **116** frontend).
 
 ## 📸 Screenshots
 
@@ -171,6 +171,6 @@ plain JSON files (no database).
 ## ✅ Tests
 
 ```bash
-cd backend && . .venv/bin/activate && pytest    # 111 passing
-cd frontend && npm test                          # 110 passing
+cd backend && . .venv/bin/activate && pytest    # 127 passing
+cd frontend && npm test                          # 116 passing
 ```

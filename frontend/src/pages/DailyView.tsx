@@ -451,6 +451,26 @@ export default function DailyView() {
 
   const approvedCount = approvedEntries.length;
 
+  // Range summary for the KPI stat tiles: total hours, how many entries are
+  // approved vs. still to log, hours already in Odoo, and distinct contracts.
+  const kpis = useMemo(() => {
+    const loggedList = proposals.filter((p) => p.already_logged);
+    const approvableCount = proposals.length - loggedList.length;
+    const loggedHours = loggedList.reduce((s, p) => s + p.event.hours, 0);
+    const contractIds = new Set<number>();
+    for (const p of proposals) {
+      const cid = rows[rowKey(p)]?.contractId ?? p.match.contract_id ?? null;
+      if (cid != null) contractIds.add(cid);
+    }
+    return {
+      total: contractSummary.total,
+      approvableCount,
+      loggedHours,
+      loggedCount: loggedList.length,
+      contractCount: contractIds.size,
+    };
+  }, [proposals, rows, contractSummary.total]);
+
   return (
     <div className="page">
       <header className="page__header">
@@ -611,6 +631,28 @@ export default function DailyView() {
           onPrevWeek={() => setCalendarWeekStart((w) => addDays(w, -7))}
           onNextWeek={() => setCalendarWeekStart((w) => addDays(w, 7))}
         />
+      )}
+
+      {!loading && view === "list" && proposals.length > 0 && (
+        <section className="kpis" aria-label="Range summary">
+          <div className="kpi">
+            <span className="kpi__label">Range total</span>
+            <span className="kpi__value num">{formatHours(kpis.total)}</span>
+            <span className="kpi__sub">
+              {kpis.contractCount} contract{kpis.contractCount === 1 ? "" : "s"}
+            </span>
+          </div>
+          <div className="kpi">
+            <span className="kpi__label">Approved to push</span>
+            <span className="kpi__value num">{approvedCount}</span>
+            <span className="kpi__sub">of {kpis.approvableCount} to log</span>
+          </div>
+          <div className="kpi">
+            <span className="kpi__label">Already logged</span>
+            <span className="kpi__value num">{formatHours(kpis.loggedHours)}</span>
+            <span className="kpi__sub">{kpis.loggedCount} in Odoo</span>
+          </div>
+        </section>
       )}
 
       {!loading && view === "list" && proposals.length > 0 && (
