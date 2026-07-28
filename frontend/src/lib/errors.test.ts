@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { isUnreachableError } from "./errors";
+import { isUnreachableError, isSessionExpiredError } from "./errors";
 
 describe("isUnreachableError", () => {
   it("returns true for an Error whose message contains 'VPN'", () => {
@@ -45,5 +45,27 @@ describe("isUnreachableError", () => {
 
   it("returns false for an empty string", () => {
     expect(isUnreachableError("")).toBe(false);
+  });
+});
+
+describe("isSessionExpiredError", () => {
+  it("matches the 'session expired' phrase (case-insensitive)", () => {
+    expect(isSessionExpiredError(new Error("Odoo session expired — paste a fresh…"))).toBe(true);
+    expect(isSessionExpiredError("SESSION EXPIRED")).toBe(true);
+  });
+
+  it("matches a 401 status string", () => {
+    expect(isSessionExpiredError("401: Unauthorized")).toBe(true);
+    expect(isSessionExpiredError(new Error("401: session gone"))).toBe(true);
+  });
+
+  it("returns false for VPN / 503 unreachable errors", () => {
+    expect(isSessionExpiredError(new Error("503: check your VPN"))).toBe(false);
+  });
+
+  it("returns false for null, undefined and empty string", () => {
+    expect(isSessionExpiredError(null)).toBe(false);
+    expect(isSessionExpiredError(undefined)).toBe(false);
+    expect(isSessionExpiredError("")).toBe(false);
   });
 });
