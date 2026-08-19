@@ -8,6 +8,7 @@ from fastapi.testclient import TestClient
 from app import deps
 from app.colors import ColorStore
 from app.config import Settings
+from app.excluded import ExcludedStore
 from app.ignore import IgnoreStore
 from app.ledger import Ledger
 from app.main import app
@@ -22,6 +23,7 @@ def client(tmp_path, monkeypatch):
     lg = Ledger(tmp_path / "ledger.json")
     cs = ColorStore(tmp_path / "project_colors.json")
     ig = IgnoreStore(tmp_path / "ignore_keywords.json")
+    ex = ExcludedStore(tmp_path / "excluded.json")
 
     fake_odoo = MagicMock(spec=OdooClient)
     fake_odoo.list_contracts.return_value = [OdooRef(id=10, name="[10] GreenVolt")]
@@ -45,6 +47,7 @@ def client(tmp_path, monkeypatch):
     app.dependency_overrides[deps.settings] = lambda: fake_settings
     app.dependency_overrides[deps.colors_store] = lambda: cs
     app.dependency_overrides[deps.ignore_store] = lambda: ig
+    app.dependency_overrides[deps.excluded_store] = lambda: ex
 
     yield TestClient(app), fake_odoo, lg
     app.dependency_overrides.clear()
@@ -150,6 +153,7 @@ def demo_client(tmp_path):
     lg = Ledger(tmp_path / "ledger.json")
     cs = ColorStore(tmp_path / "project_colors.json")
     ig = IgnoreStore(tmp_path / "ignore_keywords.json")
+    ex = ExcludedStore(tmp_path / "excluded.json")
 
     demo_settings = Settings(
         GOOGLE_CALENDAR_URL="",
@@ -165,9 +169,41 @@ def demo_client(tmp_path):
     app.dependency_overrides[deps.settings] = lambda: demo_settings
     app.dependency_overrides[deps.colors_store] = lambda: cs
     app.dependency_overrides[deps.ignore_store] = lambda: ig
+    app.dependency_overrides[deps.excluded_store] = lambda: ex
 
     yield TestClient(app), lg, ig
     app.dependency_overrides.clear()
+
+
+def test_excluded_hides_and_restores(demo_client):
+    c, _, _ = demo_client
+    url = "/api/calendar/events?start=2026-06-01&end=2026-06-05"
+    events = c.get(url).json()
+    assert len(events) > 0
+    ev = events[0]["event"]
+    uid, start = ev["uid"], ev["start"]
+
+    # Exclude with metadata → disappears from the feed.
+    assert c.post("/api/excluded", json={
+        "uid": uid, "start": start, "end": ev["end"],
+        "title": ev["title"], "date": ev["date"],
+    }).status_code == 200
+    after = c.get(url).json()
+    assert len(after) == len(events) - 1
+    assert all(not (e["event"]["uid"] == uid and e["event"]["start"] == start)
+               for e in after)
+
+    # Listed in GET with its metadata.
+    removed = c.get("/api/excluded").json()
+    assert any(r["uid"] == uid and r["start"] == start and r["title"] == ev["title"]
+               for r in removed)
+
+    # Restore → reappears, list empties.
+    assert c.request("DELETE", "/api/excluded",
+                     json={"uid": uid, "start": start}).status_code == 200
+    assert c.get("/api/excluded").json() == []
+    back = c.get(url).json()
+    assert any(e["event"]["uid"] == uid and e["event"]["start"] == start for e in back)
 
 
 def test_demo_contracts(demo_client):

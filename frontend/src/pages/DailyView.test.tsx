@@ -14,6 +14,7 @@ vi.mock("../api/client", () => ({
     events: vi.fn(),
     push: vi.fn(),
     testConnection: vi.fn(),
+    excludeEntry: vi.fn(),
   },
 }));
 
@@ -102,6 +103,7 @@ beforeEach(() => {
     { id: 20, name: "Beta Ltd" },
   ]);
   vi.mocked(api.getColors).mockResolvedValue({});
+  vi.mocked(api.excludeEntry).mockResolvedValue({ status: "excluded" });
   vi.mocked(api.events).mockResolvedValue(SAMPLE_PROPOSALS);
   vi.mocked(api.push).mockResolvedValue({
     results: [
@@ -298,6 +300,26 @@ describe("DailyView page", () => {
     expect(
       screen.getByRole("button", { name: /Show logged/i }),
     ).toBeInTheDocument();
+  });
+
+  it("persists removal via api.excludeEntry with event metadata", async () => {
+    renderDailyView();
+    await userEvent.click(
+      screen.getByRole("button", { name: /Refresh from calendar/i }),
+    );
+    await userEvent.click(
+      await screen.findByRole("button", { name: /Row actions for "Team Sync"/i }),
+    );
+    await userEvent.click(
+      screen.getByRole("menuitem", { name: /Remove from import/i }),
+    );
+
+    await waitFor(() => {
+      expect(screen.queryByText("Team Sync")).not.toBeInTheDocument();
+    });
+    expect(api.excludeEntry).toHaveBeenCalledWith(
+      expect.objectContaining({ uid: "ev-1", title: "Team Sync" }),
+    );
   });
 
   it("calls api.events with the selected from/to dates on Refresh click", async () => {

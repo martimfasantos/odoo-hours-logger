@@ -137,6 +137,20 @@ class AnalyticsResponse(BaseModel):
     totals: AnalyticsTotals
     weekly: list[AnalyticsWeek]
     currency: str = "EUR"
+class ExcludedEntryRef(BaseModel):
+    uid: str
+    start: str
+    end: str = ""
+    title: str = ""
+    date: str = ""
+
+
+class RemovedEvent(BaseModel):
+    uid: str
+    start: str
+    end: str = ""
+    title: str = ""
+    date: str = ""
 
 
 class ConfigValues(BaseModel):

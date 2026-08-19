@@ -78,6 +78,14 @@ export interface OverviewResponse {
   blocks: OverviewBlock[];
 }
 
+export interface RemovedEvent {
+  uid: string;
+  start: string;
+  end: string;
+  title: string;
+  date: string;
+}
+
 export interface TestConnectionResult {
   odoo: boolean;
   calendar: boolean;

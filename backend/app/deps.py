@@ -2,6 +2,7 @@ from functools import lru_cache
 
 from app.colors import ColorStore
 from app.config import Settings, get_settings
+from app.excluded import ExcludedStore
 from app.ignore import IgnoreStore
 from app.ledger import Ledger
 from app.odoo_client import OdooClient
@@ -45,3 +46,8 @@ def odoo() -> OdooClient:
         user_id=s.ODOO_USER_ID,
         network_member_id=s.ODOO_NETWORK_MEMBER_ID,
     )
+
+
+@lru_cache
+def excluded_store() -> ExcludedStore:
+    return ExcludedStore(settings().data_path("excluded.json"))

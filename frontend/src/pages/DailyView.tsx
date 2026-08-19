@@ -323,8 +323,11 @@ export default function DailyView() {
     setRow(rowKey(p), { contractId });
   }
 
-  /** Remove a single proposal from the loaded set (persists across tab switches until next Refresh). */
-  function removeProposal(p: ProposedEntry) {
+  /**
+   * Remove a proposal and persist the removal so it stays hidden across
+   * calendar re-syncs. Restorable from Settings → Removed events.
+   */
+  async function removeProposal(p: ProposedEntry) {
     const k = rowKey(p);
     // Recompute overlaps on the remaining events so neighbours' "Overlap"
     // badges update (and clear when nothing overlaps them any more).
@@ -336,6 +339,19 @@ export default function DailyView() {
       delete next[k];
       return next;
     });
+    try {
+      await api.excludeEntry({
+        uid: p.event.uid,
+        start: p.event.start,
+        end: p.event.end,
+        title: p.event.title,
+        date: p.event.date,
+      });
+    } catch (e) {
+      // Persist failed — put the row back so the removal isn't silently lost.
+      setProposals((prev) => recomputeOverlaps([...prev, p]));
+      toast.error(`Failed to remove entry: ${String(e)}`);
+    }
   }
 
   const approvedEntries: PushEntry[] = useMemo(
