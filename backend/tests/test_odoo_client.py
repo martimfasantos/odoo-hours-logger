@@ -235,8 +235,10 @@ def test_network_member_missing_raises():
 
 def test_session_expired_on_html_response():
     c, _ = _client([FakeResponse("<html>login</html>", content_type="text/html")])
-    with pytest.raises(OdooSessionExpired):
+    with pytest.raises(OdooSessionExpired) as excinfo:
         c.session_info()
+    # The UI detects the push-path error by this phrase; keep them in sync.
+    assert "session expired" in str(excinfo.value).lower()
 
 
 def test_session_expired_on_null_uid():
