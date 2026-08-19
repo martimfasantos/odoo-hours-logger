@@ -13,9 +13,10 @@ import Button from "../components/Button";
 import Badge from "../components/Badge";
 import Spinner from "../components/Spinner";
 import VpnModal from "../components/VpnModal";
+import SessionExpiredModal from "../components/SessionExpiredModal";
 import DailyCalendar from "./DailyCalendar";
 import { colorForContract, UNASSIGNED_COLOR } from "../lib/colors";
-import { isUnreachableError } from "../lib/errors";
+import { isUnreachableError, isSessionExpiredError } from "../lib/errors";
 import { useLogHours, type RowState } from "../state/LogHoursContext";
 import {
   startOfWeek,
@@ -150,6 +151,7 @@ export default function DailyView() {
     null,
   );
   const [vpnOpen, setVpnOpen] = useState(false);
+  const [sessionExpiredOpen, setSessionExpiredOpen] = useState(false);
 
   // Which row's action menu is currently open (only one at a time).
   const [openMenuKey, setOpenMenuKey] = useState<string | null>(null);
@@ -189,6 +191,7 @@ export default function DailyView() {
       .then(setContracts)
       .catch((e) => {
         if (isUnreachableError(e)) setVpnOpen(true);
+        else if (isSessionExpiredError(e)) setSessionExpiredOpen(true);
         toast.error(`Failed to load contracts: ${String(e)}`);
       });
   }
@@ -368,6 +371,9 @@ export default function DailyView() {
         else failed += 1;
       }
       setResults(map);
+      if (resp.results.some((r) => !r.success && isSessionExpiredError(r.error))) {
+        setSessionExpiredOpen(true);
+      }
       if (failed === 0) {
         toast.success(`${ok} logged to Odoo`);
       } else if (ok === 0) {
@@ -450,6 +456,26 @@ export default function DailyView() {
   }, [proposals, rows, contracts]);
 
   const approvedCount = approvedEntries.length;
+
+  // Range summary for the KPI stat tiles: total hours, how many entries are
+  // approved vs. still to log, hours already in Odoo, and distinct contracts.
+  const kpis = useMemo(() => {
+    const loggedList = proposals.filter((p) => p.already_logged);
+    const approvableCount = proposals.length - loggedList.length;
+    const loggedHours = loggedList.reduce((s, p) => s + p.event.hours, 0);
+    const contractIds = new Set<number>();
+    for (const p of proposals) {
+      const cid = rows[rowKey(p)]?.contractId ?? p.match.contract_id ?? null;
+      if (cid != null) contractIds.add(cid);
+    }
+    return {
+      total: contractSummary.total,
+      approvableCount,
+      loggedHours,
+      loggedCount: loggedList.length,
+      contractCount: contractIds.size,
+    };
+  }, [proposals, rows, contractSummary.total]);
 
   return (
     <div className="page">
@@ -611,6 +637,28 @@ export default function DailyView() {
           onPrevWeek={() => setCalendarWeekStart((w) => addDays(w, -7))}
           onNextWeek={() => setCalendarWeekStart((w) => addDays(w, 7))}
         />
+      )}
+
+      {!loading && view === "list" && proposals.length > 0 && (
+        <section className="kpis" aria-label="Range summary">
+          <div className="kpi">
+            <span className="kpi__label">Range total</span>
+            <span className="kpi__value num">{formatHours(kpis.total)}</span>
+            <span className="kpi__sub">
+              {kpis.contractCount} contract{kpis.contractCount === 1 ? "" : "s"}
+            </span>
+          </div>
+          <div className="kpi">
+            <span className="kpi__label">Approved to push</span>
+            <span className="kpi__value num">{approvedCount}</span>
+            <span className="kpi__sub">of {kpis.approvableCount} to log</span>
+          </div>
+          <div className="kpi">
+            <span className="kpi__label">Already logged</span>
+            <span className="kpi__value num">{formatHours(kpis.loggedHours)}</span>
+            <span className="kpi__sub">{kpis.loggedCount} in Odoo</span>
+          </div>
+        </section>
       )}
 
       {!loading && view === "list" && proposals.length > 0 && (
@@ -1007,6 +1055,11 @@ export default function DailyView() {
         retrying={testing}
         onRetry={handleRetry}
         onClose={() => setVpnOpen(false)}
+      />
+
+      <SessionExpiredModal
+        open={sessionExpiredOpen}
+        onClose={() => setSessionExpiredOpen(false)}
       />
     </div>
   );

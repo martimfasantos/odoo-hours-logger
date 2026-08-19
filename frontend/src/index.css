@@ -1,25 +1,33 @@
-@import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Fira+Sans:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
 /* ============================================================
-   Design tokens — "Data-Dense Dashboard"
+   Design tokens — "Calm Neutral"
    ============================================================ */
 :root {
-  --color-primary: #1E40AF;
+  /* Warm paper canvas, teal accent, amber call-to-action */
+  --color-primary: #0E7A6B;         /* teal — buttons, active nav, focus */
+  --color-primary-hover: #0B6558;
   --color-on-primary: #FFFFFF;
-  --color-secondary: #3B82F6;
-  --color-accent: #D97706;
-  --color-bg: #F8FAFC;
-  --color-fg: #1E3A8A;
-  --color-text: #1E293B;
-  --color-muted: #E9EEF6;
-  --color-border: #DBEAFE;
-  --color-danger: #DC2626;
-  --color-success: #15803D;
-  --color-ring: #1E40AF;
+  --color-secondary: #159A87;       /* lighter teal — icons, hovers, info */
+  --color-accent: #E0892E;          /* amber — highlights */
+  --color-accent-weak: #E6F4F1;     /* teal tint — soft fills, focus ring, active nav */
+  --color-cta: #E0892E;             /* amber — primary call-to-action (Push) */
+  --color-cta-hover: #C9781F;
+  --color-on-cta: #FFFFFF;
+  --color-bg: #F6F4EF;              /* warm paper */
+  --color-fg: #24303A;              /* headings / dark slate */
+  --color-text: #2F3A43;
+  --color-muted: #EFECE4;           /* warm light fill — table head, chips */
+  --color-border: #E7E1D6;          /* warm hairline */
+  --color-danger: #C6473E;
+  --color-success: #1F7A44;
+  --color-ring: #0E7A6B;
 
   /* Surfaces */
   --color-surface: #FFFFFF;
-  --color-text-muted: #64748B;
+  --color-surface-2: #FBFAF7;
+  --color-text-muted: #6B7680;
+  --color-row-hover: #F3F0EA;       /* warm row hover */
 
   /* Spacing rhythm (4 / 8) */
   --space-1: 4px;
@@ -30,18 +38,19 @@
   --space-6: 24px;
   --space-8: 32px;
 
-  --radius-sm: 4px;
-  --radius: 6px;
-  --radius-lg: 10px;
+  --radius-sm: 6px;
+  --radius: 10px;
+  --radius-lg: 16px;
+  --radius-pill: 999px;
 
-  --shadow-card: 0 1px 2px rgba(15, 23, 42, 0.04), 0 1px 3px rgba(15, 23, 42, 0.06);
-  --shadow-pop: 0 4px 12px rgba(15, 23, 42, 0.12);
+  --shadow-card: 0 1px 2px rgba(37, 48, 58, 0.04), 0 6px 20px rgba(37, 48, 58, 0.06);
+  --shadow-pop: 0 12px 30px rgba(37, 48, 58, 0.16);
 
   --content-max: 1200px;
   --sidebar-w: 232px;
 
-  --font-ui: 'Fira Sans', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-  --font-mono: 'Fira Code', ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font-ui: 'Plus Jakarta Sans', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
 
   --transition: 180ms ease;
 
@@ -82,9 +91,9 @@ h1,
 h2,
 h3 {
   color: var(--color-fg);
-  font-weight: 600;
+  font-weight: 700;
   margin: 0;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.02em;
 }
 
 a {
@@ -195,12 +204,12 @@ a {
   background: var(--color-muted);
 }
 .navlink.active {
-  background: var(--color-primary);
-  color: var(--color-on-primary);
+  background: var(--color-accent-weak);
+  color: var(--color-primary);
   font-weight: 600;
 }
 .navlink.active svg {
-  color: var(--color-on-primary);
+  color: var(--color-primary);
 }
 .navlink svg {
   color: var(--color-secondary);
@@ -310,7 +319,7 @@ a {
 .select:focus {
   outline: none;
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px rgba(30, 64, 175, 0.15);
+  box-shadow: 0 0 0 3px var(--color-accent-weak);
 }
 .input[type="date"] {
   font-family: var(--font-mono);
@@ -369,8 +378,8 @@ a {
   font-weight: 600;
   line-height: 1;
   min-height: 38px;
-  padding: 0 var(--space-4);
-  border-radius: var(--radius);
+  padding: 0 var(--space-5);
+  border-radius: var(--radius-pill);
   border: 1px solid transparent;
   cursor: pointer;
   white-space: nowrap;
@@ -391,7 +400,7 @@ a {
   color: var(--color-on-primary);
 }
 .btn--primary:not(:disabled):hover {
-  background: #1B3899;
+  background: var(--color-primary-hover);
   box-shadow: var(--shadow-pop);
 }
 
@@ -441,19 +450,19 @@ a {
   flex: none;
 }
 .badge--new {
-  background: #EFF6FF;
-  color: var(--color-primary);
-  border-color: var(--color-border);
+  background: var(--color-accent-weak);
+  color: #0B6558;
+  border-color: transparent;
 }
 .badge--logged {
-  background: #475569;
-  color: #FFFFFF;
-  border-color: #334155;
+  background: #E9F7EE;
+  color: #1F7A44;
+  border-color: transparent;
 }
 .badge--warning {
-  background: #FEF3E2;
-  color: #92400E;
-  border-color: #FCD9A6;
+  background: #FBEEDD;
+  color: #A6641C;
+  border-color: transparent;
 }
 .badge--active {
   background: #ECFDF3;
@@ -502,7 +511,7 @@ a {
   transition: background var(--transition);
 }
 .table tbody tr:hover {
-  background: #F4F8FF;
+  background: var(--color-row-hover);
 }
 .table tbody tr:last-child td {
   border-bottom: none;
@@ -526,10 +535,10 @@ a {
   max-width: 320px;
 }
 .row--logged {
-  background: #E2E8F0;
+  background: var(--color-surface-2);
 }
 .row--logged td {
-  color: #64748B;
+  color: var(--color-text-muted);
 }
 /* Dim inline controls on logged rows so the whole row reads as locked */
 .row--logged .input,
@@ -539,10 +548,10 @@ a {
   opacity: 0.55;
 }
 .row--logged:hover {
-  background: #D8E1ED;
+  background: var(--color-muted);
 }
 .row--failed {
-  background: #FEF6F6;
+  background: #FBEDEC;
 }
 
 /* ============================================================
@@ -587,20 +596,23 @@ a {
   align-items: center;
   gap: var(--space-3);
   padding: var(--space-3) var(--space-5);
-  background: var(--color-fg);
-  color: var(--color-on-primary);
+  background: var(--color-surface);
+  color: var(--color-fg);
+  border: 1px solid var(--color-border);
+  border-left: 3px solid var(--color-primary);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-card);
 }
 .week-group__range {
   font-size: 1.05rem;
   font-weight: 700;
-  letter-spacing: 0.01em;
+  letter-spacing: -0.01em;
 }
 .week-group__total {
   margin-left: auto;
   font-size: 0.95rem;
   font-weight: 700;
+  color: var(--color-primary);
 }
 .week-group__approve-all {
   display: inline-flex;
@@ -608,13 +620,13 @@ a {
   gap: var(--space-2);
   font-size: 0.85rem;
   font-weight: 600;
-  color: var(--color-on-primary);
+  color: var(--color-text-muted);
   cursor: pointer;
   user-select: none;
   margin-left: var(--space-4);
 }
 .week-group__approve-all .checkbox {
-  accent-color: var(--color-on-primary);
+  accent-color: var(--color-primary);
 }
 
 /* ============================================================
@@ -691,6 +703,14 @@ a {
 }
 .push-bar__summary strong {
   color: var(--color-fg);
+}
+/* The push button is the amber call-to-action in Calm Neutral. */
+.push-bar .btn--primary {
+  background: var(--color-cta);
+  color: var(--color-on-cta);
+}
+.push-bar .btn--primary:not(:disabled):hover {
+  background: var(--color-cta-hover);
 }
 
 /* ============================================================
@@ -1688,6 +1708,47 @@ tr:last-child .row-menu {
   display: flex;
   justify-content: flex-end;
   gap: var(--space-2);
+}
+
+/* ============================================================
+   KPI stat tiles (Log Hours range summary)
+   ============================================================ */
+.kpis {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-4);
+}
+.kpi {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+  padding: var(--space-5);
+}
+.kpi__label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+.kpi__value {
+  margin-top: var(--space-1);
+  font-size: 1.75rem;
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  color: var(--color-fg);
+}
+.kpi__sub {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+}
+@media (max-width: 768px) {
+  .kpis {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* ============================================================

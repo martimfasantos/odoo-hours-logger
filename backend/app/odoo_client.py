@@ -31,8 +31,8 @@ def parse_odoo_utc(odoo_str: str, local_tz: str) -> datetime:
 
 _EXPIRED_HINTS = ("session", "expired", "login")
 _SESSION_EXPIRED_MSG = (
-    "Odoo session expired — re-copy session_id from a logged-in browser "
-    "into backend/.env"
+    "Odoo session expired — copy a fresh session_id from a logged-in Odoo "
+    "browser tab and paste it into Settings → Odoo Session ID."
 )
 
 
