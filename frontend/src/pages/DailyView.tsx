@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { RefreshCw, UploadCloud, AlertTriangle, Check, X, CalendarX2, List, CalendarDays, PlugZap, Trash2, MoreVertical } from "lucide-react";
+import { RefreshCw, UploadCloud, AlertTriangle, Check, X, CalendarX2, List, CalendarDays, PlugZap, Trash2, MoreVertical, Eye, EyeOff } from "lucide-react";
 import { api } from "../api/client";
 import type {
   OdooRef,
@@ -125,6 +125,8 @@ export default function DailyView() {
     setToDate,
     view,
     setView,
+    hideLogged,
+    setHideLogged,
     proposals,
     setProposals,
     rows,
@@ -763,7 +765,30 @@ export default function DailyView() {
 
       {!loading &&
         view === "list" &&
+        proposals.length > 0 &&
+        proposals.some((p) => p.already_logged) && (
+          <div className="select-all-bar">
+            <Button
+              variant="secondary"
+              size="sm"
+              aria-pressed={hideLogged}
+              onClick={() => setHideLogged((v) => !v)}
+            >
+              {hideLogged ? (
+                <Eye size={16} aria-hidden="true" />
+              ) : (
+                <EyeOff size={16} aria-hidden="true" />
+              )}
+              {hideLogged ? "Show logged" : "Hide logged"}
+            </Button>
+          </div>
+        )}
+
+      {!loading &&
+        view === "list" &&
         byWeek.map(({ weekStart, byDay, entries }) => {
+          // "Hide logged" skips weeks whose entries are all already-logged.
+          if (hideLogged && !entries.some((p) => !p.already_logged)) return null;
           const weekTotal = entries.reduce((s, p) => s + p.event.hours, 0);
           const weekLabel = formatWeekRange(weekStart);
           const weekSummary = approveSummary(entries, rows);
@@ -800,6 +825,12 @@ export default function DailyView() {
                 );
                 const dayLabel = formatDayHeading(date);
                 const daySummary = approveSummary(dayEntries, rows);
+                // Rows actually rendered (logged hidden when the toggle is on);
+                // totals/summary above stay computed from the full set.
+                const visibleDay = hideLogged
+                  ? dayEntries.filter((p) => !p.already_logged)
+                  : dayEntries;
+                if (visibleDay.length === 0) return null;
 
                 return (
                   <div className="card" key={date} aria-label={date}>
@@ -846,7 +877,7 @@ export default function DailyView() {
                           </tr>
                         </thead>
                         <tbody>
-                          {dayEntries.map((p) => {
+                          {visibleDay.map((p) => {
                             const key = rowKey(p);
                             const r = rows[key];
                             const result = results[key];

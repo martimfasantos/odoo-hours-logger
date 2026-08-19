@@ -43,6 +43,8 @@ interface LogHoursContextValue {
   setToDate: Dispatch<SetStateAction<string>>;
   view: "list" | "calendar";
   setView: Dispatch<SetStateAction<"list" | "calendar">>;
+  hideLogged: boolean;
+  setHideLogged: Dispatch<SetStateAction<boolean>>;
 
   // Log Hours loaded data + selections.
   proposals: ProposedEntry[];
@@ -70,6 +72,7 @@ export function LogHoursProvider({ children }: { children: ReactNode }) {
   const [fromDate, setFromDate] = useState(today);
   const [toDate, setToDate] = useState(today);
   const [view, setView] = useState<"list" | "calendar">("list");
+  const [hideLogged, setHideLogged] = useState(false);
 
   // Log Hours loaded data + selections.
   const [proposals, setProposals] = useState<ProposedEntry[]>([]);
@@ -93,6 +96,8 @@ export function LogHoursProvider({ children }: { children: ReactNode }) {
       setToDate,
       view,
       setView,
+      hideLogged,
+      setHideLogged,
       proposals,
       setProposals,
       rows,
@@ -110,6 +115,7 @@ export function LogHoursProvider({ children }: { children: ReactNode }) {
       fromDate,
       toDate,
       view,
+      hideLogged,
       proposals,
       rows,
       results,
