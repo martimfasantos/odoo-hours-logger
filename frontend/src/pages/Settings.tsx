@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
-import { Check, X, Eye, EyeOff, Save } from "lucide-react";
+import { Check, X, Eye, EyeOff, Save, RotateCcw } from "lucide-react";
 import { api } from "../api/client";
-import type { ConfigValues } from "../api/types";
+import type { ConfigValues, RemovedEvent } from "../api/types";
 import { useToast } from "../components/Toast";
 import Button from "../components/Button";
 import Spinner from "../components/Spinner";
@@ -123,6 +123,42 @@ export default function Settings() {
 
   // VPN modal
   const [vpnOpen, setVpnOpen] = useState(false);
+
+  // Removed events (persistently excluded), restorable here.
+  const [removed, setRemoved] = useState<RemovedEvent[]>([]);
+  const [loadingRemoved, setLoadingRemoved] = useState(false);
+
+  useEffect(() => {
+    setLoadingRemoved(true);
+    api
+      .getRemovedEvents()
+      .then(setRemoved)
+      .catch(() => setRemoved([]))
+      .finally(() => setLoadingRemoved(false));
+  }, []);
+
+  async function handleRestore(ev: RemovedEvent) {
+    try {
+      await api.restoreEntry(ev.uid, ev.start);
+      setRemoved((prev) =>
+        prev.filter((r) => !(r.uid === ev.uid && r.start === ev.start)),
+      );
+      toast.success("Event restored.");
+    } catch (e) {
+      toast.error(`Failed to restore event: ${String(e)}`);
+    }
+  }
+
+  function fmtRemoved(ev: RemovedEvent): string {
+    try {
+      return new Date(ev.start).toLocaleString(undefined, {
+        dateStyle: "medium",
+        timeStyle: "short",
+      });
+    } catch {
+      return ev.start;
+    }
+  }
 
   useEffect(() => {
     setConfigLoading(true);
@@ -371,6 +407,84 @@ export default function Settings() {
               </div>
             </div>
           </form>
+        </div>
+      </section>
+
+      <section className="card" aria-label="Removed events">
+        <div className="card__head">
+          <h3>Removed events</h3>
+          {loadingRemoved && <Spinner />}
+        </div>
+        <div className="card__pad">
+          <p className="field-reveal__note" style={{ marginBottom: "var(--space-4)" }}>
+            Events you removed from an import stay hidden on future syncs. Restore
+            one to have it reappear in Log Hours.
+          </p>
+          {!loadingRemoved && removed.length === 0 && (
+            <p className="muted" style={{ margin: 0, fontSize: "0.9rem" }}>
+              No removed events.
+            </p>
+          )}
+          {removed.length > 0 && (
+            <ul
+              style={{
+                listStyle: "none",
+                margin: 0,
+                padding: 0,
+                display: "flex",
+                flexDirection: "column",
+              }}
+            >
+              {removed.map((ev) => (
+                <li
+                  key={`${ev.uid}|${ev.start}`}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: "var(--space-3)",
+                    padding: "var(--space-3) 0",
+                    borderBottom: "1px solid var(--color-border)",
+                  }}
+                >
+                  <span
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "2px",
+                      minWidth: 0,
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontWeight: 600,
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {ev.title || "(untitled event)"}
+                    </span>
+                    <span
+                      className="num"
+                      style={{ fontSize: "0.8rem", color: "var(--color-text-muted)" }}
+                    >
+                      {fmtRemoved(ev)}
+                    </span>
+                  </span>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    aria-label={`Restore ${ev.title || "event"}`}
+                    onClick={() => handleRestore(ev)}
+                  >
+                    <RotateCcw size={14} aria-hidden="true" />
+                    Restore
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       </section>
 

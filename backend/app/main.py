@@ -14,6 +14,7 @@ from app.spa import SPAStaticFiles
 from app.aggregations import build_analytics, weekly_by_contract
 from app.calendar_source import fetch_ical, parse_events
 from app.config import Settings
+from app.excluded import ExcludedStore
 from app.ignore import IgnoreStore
 from app.ledger import Ledger
 from app.matcher import match_title
@@ -22,8 +23,8 @@ from app.colors import ColorStore
 from app.rules import RulesStore
 from app.schemas import (
     AnalyticsResponse, CalendarEvent, ColorUpdate, ConfigValues, ContractOverview,
-    ContractTotal, OdooRef, OverviewBlock, OverviewResponse, ProposedEntry,
-    PushEntry, PushResult, Rule, RuleCreate,
+    ContractTotal, ExcludedEntryRef, OdooRef, OverviewBlock, OverviewResponse,
+    ProposedEntry, PushEntry, PushResult, RemovedEvent, Rule, RuleCreate,
 )
 
 @asynccontextmanager
@@ -89,7 +90,12 @@ def _odoo_entry_keys(events: list[CalendarEvent], odoo: OdooClient,
 
 def _build_proposals(events: list[CalendarEvent], rules: list[Rule],
                      ledger: Ledger, odoo: OdooClient,
-                     demo_mode: bool) -> list[ProposedEntry]:
+                     demo_mode: bool,
+                     excluded_keys: set[str] = frozenset()) -> list[ProposedEntry]:
+    # Removed occurrences are dropped entirely (hidden; restorable from Settings).
+    if excluded_keys:
+        events = [ev for ev in events
+                  if f"{ev.uid}|{ev.start.isoformat()}" not in excluded_keys]
     odoo_keys = _odoo_entry_keys(events, odoo, demo_mode)
     proposals: list[ProposedEntry] = []
     # Mark overlaps: any two events whose intervals intersect
@@ -183,6 +189,7 @@ def put_config(body: ConfigValues, settings: Settings = Depends(deps.settings)):
     deps.ledger.cache_clear()
     deps.ignore_store.cache_clear()
     deps.colors_store.cache_clear()
+    deps.excluded_store.cache_clear()
 
     # Re-read settings after cache clear; in tests the dep override takes
     # precedence, so this falls back to the injected settings.
@@ -219,13 +226,14 @@ def calendar_events(start: Date, end: Date,
                     rules: RulesStore = Depends(deps.rules_store),
                     ledger: Ledger = Depends(deps.ledger),
                     odoo: OdooClient = Depends(deps.odoo),
-                    ignore_store: IgnoreStore = Depends(deps.ignore_store)):
+                    ignore_store: IgnoreStore = Depends(deps.ignore_store),
+                    excluded_store: ExcludedStore = Depends(deps.excluded_store)):
     user_email = settings.USER_EMAIL if settings.DEMO_MODE else _resolve_user_email(settings, odoo)
     events = _load_events(start, end, settings, user_email)
     kws = ignore_store.get()
     events = [ev for ev in events if not _is_ignored(ev.title, kws)]
     return _build_proposals(events, rules.list(), ledger, odoo,
-                            settings.DEMO_MODE)
+                            settings.DEMO_MODE, excluded_store.keys())
 
 
 @app.get("/api/timesheet/daily")
@@ -234,13 +242,14 @@ def daily(start: Date, end: Date,
           rules: RulesStore = Depends(deps.rules_store),
           ledger: Ledger = Depends(deps.ledger),
           odoo: OdooClient = Depends(deps.odoo),
-          ignore_store: IgnoreStore = Depends(deps.ignore_store)):
+          ignore_store: IgnoreStore = Depends(deps.ignore_store),
+          excluded_store: ExcludedStore = Depends(deps.excluded_store)):
     user_email = settings.USER_EMAIL if settings.DEMO_MODE else _resolve_user_email(settings, odoo)
     events = _load_events(start, end, settings, user_email)
     kws = ignore_store.get()
     events = [ev for ev in events if not _is_ignored(ev.title, kws)]
     proposals = _build_proposals(events, rules.list(), ledger, odoo,
-                                 settings.DEMO_MODE)
+                                 settings.DEMO_MODE, excluded_store.keys())
     by_day: dict[str, list[ProposedEntry]] = {}
     for p in proposals:
         by_day.setdefault(p.event.date.isoformat(), []).append(p)
@@ -253,13 +262,14 @@ def weekly(start: Date, end: Date,
            rules: RulesStore = Depends(deps.rules_store),
            ledger: Ledger = Depends(deps.ledger),
            odoo: OdooClient = Depends(deps.odoo),
-           ignore_store: IgnoreStore = Depends(deps.ignore_store)):
+           ignore_store: IgnoreStore = Depends(deps.ignore_store),
+           excluded_store: ExcludedStore = Depends(deps.excluded_store)):
     user_email = settings.USER_EMAIL if settings.DEMO_MODE else _resolve_user_email(settings, odoo)
     events = _load_events(start, end, settings, user_email)
     kws = ignore_store.get()
     events = [ev for ev in events if not _is_ignored(ev.title, kws)]
     proposals = _build_proposals(events, rules.list(), ledger, odoo,
-                                 settings.DEMO_MODE)
+                                 settings.DEMO_MODE, excluded_store.keys())
     return weekly_by_contract(proposals)
 
 
@@ -305,7 +315,8 @@ def overview(start: Date, end: Date,
              rules: RulesStore = Depends(deps.rules_store),
              ledger: Ledger = Depends(deps.ledger),
              odoo: OdooClient = Depends(deps.odoo),
-             ignore_store: IgnoreStore = Depends(deps.ignore_store)):
+             ignore_store: IgnoreStore = Depends(deps.ignore_store),
+             excluded_store: ExcludedStore = Depends(deps.excluded_store)):
     logger = logging.getLogger(__name__)
 
     user_email = (settings.USER_EMAIL if settings.DEMO_MODE
@@ -314,7 +325,7 @@ def overview(start: Date, end: Date,
     kws = ignore_store.get()
     events = [ev for ev in events if not _is_ignored(ev.title, kws)]
     proposals = _build_proposals(events, rules.list(), ledger, odoo,
-                                 settings.DEMO_MODE)
+                                 settings.DEMO_MODE, excluded_store.keys())
 
     blocks: list[OverviewBlock] = []
 
@@ -438,6 +449,25 @@ def get_ignore(ignore_store: IgnoreStore = Depends(deps.ignore_store)):
 def put_ignore(body: IgnoreUpdate,
                ignore_store: IgnoreStore = Depends(deps.ignore_store)):
     return ignore_store.set(body.keywords)
+
+
+@app.post("/api/excluded")
+def exclude_entry(body: ExcludedEntryRef,
+                  excluded_store: ExcludedStore = Depends(deps.excluded_store)):
+    excluded_store.add(body.uid, body.start, body.end, body.title, body.date)
+    return {"status": "excluded"}
+
+
+@app.get("/api/excluded", response_model=list[RemovedEvent])
+def list_excluded(excluded_store: ExcludedStore = Depends(deps.excluded_store)):
+    return excluded_store.list()
+
+
+@app.delete("/api/excluded")
+def restore_entry(body: ExcludedEntryRef,
+                  excluded_store: ExcludedStore = Depends(deps.excluded_store)):
+    excluded_store.remove(body.uid, body.start)
+    return {"status": "restored"}
 
 
 @app.get("/api/rules", response_model=list[Rule])

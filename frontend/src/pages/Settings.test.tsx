@@ -10,6 +10,8 @@ vi.mock("../api/client", () => ({
     getConfig: vi.fn(),
     saveConfig: vi.fn(),
     testConnection: vi.fn(),
+    getRemovedEvents: vi.fn(),
+    restoreEntry: vi.fn(),
   },
 }));
 
@@ -39,6 +41,8 @@ function renderSettings() {
 
 beforeEach(() => {
   vi.mocked(api.getConfig).mockResolvedValue(FULL_CONFIG);
+  vi.mocked(api.getRemovedEvents).mockResolvedValue([]);
+  vi.mocked(api.restoreEntry).mockResolvedValue({ status: "restored" });
   vi.mocked(api.saveConfig).mockResolvedValue(FULL_CONFIG);
   vi.mocked(api.testConnection).mockResolvedValue({
     odoo: true,
@@ -131,6 +135,40 @@ describe("Settings page", () => {
 
     await waitFor(() => {
       expect(api.testConnection).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it("lists removed events and restores one", async () => {
+    vi.mocked(api.getRemovedEvents).mockResolvedValue([
+      {
+        uid: "ev-9",
+        start: "2026-06-01T09:00:00",
+        end: "2026-06-01T10:00:00",
+        title: "Standup",
+        date: "2026-06-01",
+      },
+    ]);
+    renderSettings();
+
+    const restoreBtn = await screen.findByRole("button", {
+      name: /Restore Standup/i,
+    });
+    expect(screen.getByText("Standup")).toBeInTheDocument();
+
+    await userEvent.click(restoreBtn);
+
+    await waitFor(() => {
+      expect(api.restoreEntry).toHaveBeenCalledWith("ev-9", "2026-06-01T09:00:00");
+    });
+    await waitFor(() => {
+      expect(screen.queryByText("Standup")).not.toBeInTheDocument();
+    });
+  });
+
+  it("shows the empty state when there are no removed events", async () => {
+    renderSettings();
+    await waitFor(() => {
+      expect(screen.getByText(/No removed events/i)).toBeInTheDocument();
     });
   });
 });

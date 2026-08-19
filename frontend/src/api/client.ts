@@ -1,6 +1,6 @@
 import type {
   AnalyticsResponse, ConfigValues, ContractTotal, OdooRef, OverviewResponse, ProposedEntry,
-  PushEntry, PushResult, Rule, RuleCreate, TestConnectionResult,
+  PushEntry, PushResult, RemovedEvent, Rule, RuleCreate, TestConnectionResult,
 } from "./types";
 
 async function req<T>(url: string, options?: RequestInit): Promise<T> {
@@ -49,6 +49,15 @@ export const api = {
   getIgnoreKeywords: () => req<string[]>("/api/ignore"),
   setIgnoreKeywords: (keywords: string[]) =>
     req<string[]>("/api/ignore", { method: "PUT", body: JSON.stringify({ keywords }) }),
+  excludeEntry: (e: RemovedEvent) =>
+    req<{ status: string }>("/api/excluded", {
+      method: "POST", body: JSON.stringify(e),
+    }),
+  getRemovedEvents: () => req<RemovedEvent[]>("/api/excluded"),
+  restoreEntry: (uid: string, start: string) =>
+    req<{ status: string }>("/api/excluded", {
+      method: "DELETE", body: JSON.stringify({ uid, start }),
+    }),
   getConfig: () => req<ConfigValues>("/api/config"),
   saveConfig: (values: Partial<ConfigValues>) =>
     req<ConfigValues>("/api/config", { method: "PUT", body: JSON.stringify(values) }),
