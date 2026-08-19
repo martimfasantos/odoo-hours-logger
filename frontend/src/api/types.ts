@@ -85,6 +85,39 @@ export interface TestConnectionResult {
   errors: Record<string, string>;
 }
 
+export interface AnalyticsProject {
+  contract_id: number;
+  contract_name: string;
+  hours: number;
+  allocation_pct: number;
+  internal_rate: number | null;
+  external_rate: number | null;
+  revenue: number;
+  cost: number;
+  margin: number;
+  margin_pct: number | null;
+}
+
+export interface AnalyticsWeek {
+  week_start: string;
+  hours: number;
+}
+
+export interface AnalyticsTotals {
+  hours: number;
+  revenue: number;
+  cost: number;
+  margin: number;
+  margin_pct: number | null;
+}
+
+export interface AnalyticsResponse {
+  projects: AnalyticsProject[];
+  totals: AnalyticsTotals;
+  weekly: AnalyticsWeek[];
+  currency: string;
+}
+
 export interface ConfigValues {
   GOOGLE_CALENDAR_URL: string;
   ODOO_URL: string;

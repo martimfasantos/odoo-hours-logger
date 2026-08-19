@@ -177,6 +177,8 @@ def test_existing_entries_normalization():
         "end_time": "2026-06-01 09:30:00",
         "work_description": "Standup",
         "duration_h": 0.5,
+        "internal_cost": 0.0,
+        "external_cost": 0.0,
     }]
 
 

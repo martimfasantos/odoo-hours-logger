@@ -168,7 +168,8 @@ class OdooClient:
               ["start_time", "<=", end_utc],
               ["end_time", ">=", start_utc]]],
             {"fields": ["contract", "start_time", "end_time",
-                        "work_description", "duration_h"],
+                        "work_description", "duration_h",
+                        "internal_cost", "external_cost"],
              "context": self._context()},
         )
         normalized = []
@@ -187,8 +188,28 @@ class OdooClient:
                 "end_time": row.get("end_time"),
                 "work_description": row.get("work_description") or "",
                 "duration_h": float(row.get("duration_h") or 0.0),
+                "internal_cost": float(row.get("internal_cost") or 0.0),
+                "external_cost": float(row.get("external_cost") or 0.0),
             })
         return normalized
+
+    def contract_rates(self, contract_ids: list[int]) -> dict[int, dict]:
+        """Fetch per-contract rate attributes, keyed by contract id."""
+        if not contract_ids:
+            return {}
+        rows = self.call_kw(
+            "contract", "read",
+            [list(contract_ids)],
+            {"fields": ["internal_rate", "external_rate", "margin"]},
+        )
+        out: dict[int, dict] = {}
+        for row in rows or []:
+            out[row["id"]] = {
+                "internal_rate": float(row.get("internal_rate") or 0.0),
+                "external_rate": float(row.get("external_rate") or 0.0),
+                "margin": float(row.get("margin") or 0.0),
+            }
+        return out
 
     # -- writes -------------------------------------------------------------
 

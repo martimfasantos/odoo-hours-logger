@@ -5,11 +5,13 @@ import {
   ClipboardCheck,
   Tags,
   Settings as SettingsIcon,
+  BarChart3,
   Clock,
 } from "lucide-react";
 import { api } from "./api/client";
 import DailyView from "./pages/DailyView";
 import Logged from "./pages/Logged";
+import Analytics from "./pages/Analytics";
 import MappingRules from "./pages/MappingRules";
 import Settings from "./pages/Settings";
 import { LogHoursProvider } from "./state/LogHoursContext";
@@ -19,6 +21,7 @@ type Health = "checking" | "ok" | "down";
 const NAV = [
   { to: "/", label: "Log Hours", icon: CalendarClock, end: true },
   { to: "/logged", label: "Logged", icon: ClipboardCheck, end: false },
+  { to: "/analytics", label: "Analytics", icon: BarChart3, end: false },
   { to: "/rules", label: "Mapping rules", icon: Tags, end: false },
   { to: "/settings", label: "Settings", icon: SettingsIcon, end: false },
 ];
@@ -91,6 +94,7 @@ export default function App() {
           <Routes>
             <Route path="/" element={<DailyView />} />
             <Route path="/logged" element={<Logged />} />
+            <Route path="/analytics" element={<Analytics />} />
             <Route path="/rules" element={<MappingRules />} />
             <Route path="/settings" element={<Settings />} />
           </Routes>
