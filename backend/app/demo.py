@@ -21,6 +21,32 @@ _TEMPLATES = [
 ]
 
 
+def demo_analytics(start: Date, end: Date, local_tz: str):
+    """Deterministic sample analytics so the tab works offline (demo mode)."""
+    from app.aggregations import build_analytics
+
+    def entry(cid, name, day_off, hours, internal, external):
+        return {
+            "contract_id": cid, "contract_name": name,
+            "duration_h": hours, "internal_cost": internal,
+            "external_cost": external,
+            "local_date": min(start + timedelta(days=day_off), end),
+        }
+
+    entries = [
+        entry(9001, "[9001] Demo Client A", 0, 4.0, 160.0, 400.0),
+        entry(9001, "[9001] Demo Client A", 7, 3.0, 120.0, 300.0),
+        entry(9002, "[9002] Demo Client B", 1, 5.0, 250.0, 500.0),
+        entry(9003, "[9003] Internal", 2, 2.0, 90.0, 0.0),
+    ]
+    rates = {
+        9001: {"internal_rate": 40.0, "external_rate": 100.0, "margin": 0.6},
+        9002: {"internal_rate": 50.0, "external_rate": 100.0, "margin": 0.5},
+        9003: {"internal_rate": 45.0, "external_rate": 0.0, "margin": 0.0},
+    }
+    return build_analytics(entries, rates, start, end)
+
+
 def demo_events(start: Date, end: Date, local_tz: str) -> list[CalendarEvent]:
     tz = ZoneInfo(local_tz)
     span = (end - start).days  # number of extra days available (0 = single day)
