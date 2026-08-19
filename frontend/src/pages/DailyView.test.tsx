@@ -273,6 +273,33 @@ describe("DailyView page", () => {
     expect(screen.getAllByText("Overlap")).toHaveLength(2);
   });
 
+  it("hides logged rows when 'Hide logged' is toggled", async () => {
+    const logged = { ...SAMPLE_PROPOSALS[0], already_logged: true }; // Team Sync
+    const unlogged = SAMPLE_PROPOSALS[1]; // Client Call
+    vi.mocked(api.events).mockResolvedValue([logged, unlogged]);
+
+    renderDailyView();
+    await userEvent.click(
+      screen.getByRole("button", { name: /Refresh from calendar/i }),
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("Team Sync")).toBeInTheDocument();
+    });
+    expect(screen.getByText("Client Call")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: /Hide logged/i }));
+
+    await waitFor(() => {
+      expect(screen.queryByText("Team Sync")).not.toBeInTheDocument();
+    });
+    // Unlogged row stays; toggle flips to "Show logged".
+    expect(screen.getByText("Client Call")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /Show logged/i }),
+    ).toBeInTheDocument();
+  });
+
   it("calls api.events with the selected from/to dates on Refresh click", async () => {
     renderDailyView();
     await userEvent.click(
