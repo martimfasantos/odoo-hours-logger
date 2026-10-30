@@ -70,7 +70,8 @@ export default function Analytics() {
   const toast = useToast();
   const [from, setFrom] = useState(firstOfMonthISO());
   const [to, setTo] = useState(isoDate(new Date()));
-  const [data, setData] = useState<AnalyticsResponse | null>(null);
+  // The range is kept with the response so the chart's periods match the data, not unsaved picker edits.
+  const [data, setData] = useState<{ response: AnalyticsResponse; from: string; to: string } | null>(null);
   const [colors, setColors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
   const [vpnOpen, setVpnOpen] = useState(false);
@@ -93,7 +94,7 @@ export default function Analytics() {
     }
     setLoading(true);
     try {
-      setData(await api.analytics(from, to));
+      setData({ response: await api.analytics(from, to), from, to });
     } catch (e) {
       if (isUnreachableError(e)) setVpnOpen(true);
       toast.error(`Failed to load analytics: ${String(e)}`);
@@ -108,7 +109,7 @@ export default function Analytics() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const currency = data?.currency ?? "EUR";
+  const currency = data?.response.currency ?? "EUR";
   const money = (n: number) =>
     new Intl.NumberFormat(undefined, {
       style: "currency",
@@ -134,18 +135,18 @@ export default function Analytics() {
     }).format(n);
   const isHours = chart.metric === "hours";
 
-  const shown = data ? data.projects.filter((p) => !chart.excluded.has(p.contract_id)) : [];
+  const shown = data ? data.response.projects.filter((p) => !chart.excluded.has(p.contract_id)) : [];
   const sum = (k: "hours" | "revenue" | "cost") => shown.reduce((acc, p) => acc + p[k], 0);
   const totals = { hours: sum("hours"), revenue: sum("revenue"), cost: sum("cost") };
   const totalMargin = totals.revenue - totals.cost;
   const { periods, series } = data
-    ? buildSeries(data.entries, data.projects, {
+    ? buildSeries(data.response.entries, data.response.projects, {
         granularity: chart.granularity,
         groupBy: chart.groupBy,
         metric: chart.metric,
         includedIds: new Set(shown.map((p) => p.contract_id)),
-        from,
-        to,
+        from: data.from,
+        to: data.to,
         colors,
       })
     : { periods: [], series: [] };
@@ -205,7 +206,7 @@ export default function Analytics() {
         </div>
       )}
 
-      {!loading && data && data.projects.length === 0 && (
+      {!loading && data && data.response.projects.length === 0 && (
         <div className="card">
           <div className="empty">
             <BarChart3 size={40} aria-hidden="true" />
@@ -214,7 +215,7 @@ export default function Analytics() {
         </div>
       )}
 
-      {!loading && data && data.projects.length > 0 && (
+      {!loading && data && data.response.projects.length > 0 && (
         <>
           <section className="card" aria-label="Over time">
             <div className="card__head chart-card__head">
@@ -240,7 +241,7 @@ export default function Analytics() {
                 />
               </div>
               <div className="chart-chips" role="group" aria-label="Projects">
-                {data.projects.map((p) => (
+                {data.response.projects.map((p) => (
                   <button
                     key={p.contract_id}
                     type="button"
