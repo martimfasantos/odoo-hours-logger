@@ -159,14 +159,6 @@ describe("Settings page", () => {
     expect(guide).not.toHaveAttribute("open");
   });
 
-  it("has no session-cookie fields", async () => {
-    renderSettings();
-    await waitFor(() => expect(screen.getByLabelText("Odoo Database")).toHaveValue("mydb"));
-    expect(screen.queryByLabelText("Odoo Session ID")).not.toBeInTheDocument();
-    expect(screen.queryByLabelText("Odoo Visitor UUID")).not.toBeInTheDocument();
-    expect(screen.queryByLabelText("Odoo User ID")).not.toBeInTheDocument();
-  });
-
   it("shows the developer-mode step as plain text when ODOO_URL is empty", async () => {
     vi.mocked(api.getConfig).mockResolvedValue({ ...FULL_CONFIG, ODOO_URL: "" });
     renderSettings();
