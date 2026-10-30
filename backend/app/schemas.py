@@ -60,6 +60,8 @@ class PushResult(BaseModel):
 class OdooRef(BaseModel):
     id: int
     name: str
+    start_date: Optional[Date] = None
+    end_date: Optional[Date] = None
 
     @field_validator("name", mode="before")
     @classmethod

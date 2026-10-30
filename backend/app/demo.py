@@ -4,9 +4,16 @@ from zoneinfo import ZoneInfo
 
 from app.schemas import CalendarEvent, OdooRef
 
+_TODAY = Date.today()
+
+# Client B has already ended so the contract-date warnings show in demo mode.
 DEMO_CONTRACTS: list[OdooRef] = [
-    OdooRef(id=9001, name="[9001] Demo Client A"),
-    OdooRef(id=9002, name="[9002] Demo Client B"),
+    OdooRef(id=9001, name="[9001] Demo Client A",
+            start_date=_TODAY - timedelta(days=365),
+            end_date=_TODAY + timedelta(days=365)),
+    OdooRef(id=9002, name="[9002] Demo Client B",
+            start_date=_TODAY - timedelta(days=365),
+            end_date=_TODAY - timedelta(days=30)),
     OdooRef(id=9003, name="[9003] Internal"),
 ]
 

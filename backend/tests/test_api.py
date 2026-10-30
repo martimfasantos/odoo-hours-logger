@@ -215,6 +215,11 @@ def test_demo_contracts(demo_client):
     names = {p["name"] for p in data}
     assert "[9001] Demo Client A" in names
     assert "[9003] Internal" in names
+    today = Date.today().isoformat()
+    by_id = {p["id"]: p for p in data}
+    assert by_id[9001]["end_date"] > today
+    assert by_id[9002]["end_date"] < today
+    assert by_id[9003]["end_date"] is None
 
 
 def test_demo_events_returns_sample(demo_client):
