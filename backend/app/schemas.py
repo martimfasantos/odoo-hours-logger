@@ -157,6 +157,8 @@ class ConfigValues(BaseModel):
     GOOGLE_CALENDAR_URL: Optional[str] = None
     ODOO_URL: Optional[str] = None
     ODOO_DB: Optional[str] = None
+    ODOO_USERNAME: Optional[str] = None
+    ODOO_API_KEY: Optional[str] = None
     ODOO_SESSION_ID: Optional[str] = None
     ODOO_VISITOR_UUID: Optional[str] = None
     ODOO_USER_ID: Optional[int] = None

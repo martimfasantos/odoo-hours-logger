@@ -2,6 +2,7 @@ from datetime import date as Date
 from datetime import datetime, timezone
 from unittest.mock import MagicMock
 
+import httpx
 import pytest
 from fastapi.testclient import TestClient
 
@@ -595,6 +596,32 @@ def test_contracts_odoo_unreachable_returns_503(client):
     assert "VPN" in resp.json()["detail"]
 
 
+def test_contracts_rejected_api_key_returns_401_naming_the_key(client):
+    class RejectingHttp:
+        def post(self, url, json=None):
+            return httpx.Response(200, json={"jsonrpc": "2.0", "result": False})
+
+    c, _, _ = client
+    app.dependency_overrides[deps.odoo] = lambda: OdooClient(
+        base_url="https://odoo.example.com", session_id="", local_tz="Europe/Lisbon",
+        db="odoo", login="me@example.com", api_key="bad-key",
+        http_client=RejectingHttp())
+    resp = c.get("/api/odoo/contracts")
+    assert resp.status_code == 401
+    assert resp.json()["detail"] == (
+        "Odoo rejected your API key — create a new one in Odoo and paste it "
+        "into Settings → Odoo API key.")
+
+
+def test_odoo_dep_uses_api_key_from_settings(monkeypatch):
+    monkeypatch.setattr(deps, "settings", lambda: Settings(
+        _env_file=None, ODOO_URL="https://odoo.example.com", ODOO_DB="odoo",
+        ODOO_USERNAME="me@example.com", ODOO_API_KEY="key-abc"))
+    odoo = deps.odoo.__wrapped__()
+    assert odoo.uses_api_key is True
+    assert (odoo.login, odoo.api_key) == ("me@example.com", "key-abc")
+
+
 # ---------------------------------------------------------------------------
 # Config endpoint tests
 # ---------------------------------------------------------------------------
@@ -633,3 +660,22 @@ def test_config_put_writes_env_file_and_returns_200(client, tmp_path, monkeypatc
     assert "DEMO_MODE=false" in written
     # Existing unrelated line preserved
     assert "ODOO_URL=https://old.example.com" in written
+
+
+def test_config_exposes_and_saves_api_key_fields(client, tmp_path, monkeypatch):
+    import app.env_file as ef
+
+    env_file_path = tmp_path / ".env"
+    monkeypatch.setattr(ef, "ENV_PATH", env_file_path)
+    c, _, _ = client
+    app.dependency_overrides[deps.settings] = lambda: Settings(
+        _env_file=None, ODOO_USERNAME="me@example.com", ODOO_API_KEY="key-abc")
+
+    body = c.get("/api/config").json()
+    assert (body["ODOO_USERNAME"], body["ODOO_API_KEY"]) == ("me@example.com", "key-abc")
+
+    resp = c.put("/api/config", json={"ODOO_USERNAME": "new@example.com",
+                                      "ODOO_API_KEY": "key-new"})
+    assert resp.status_code == 200
+    assert env_file_path.read_text() == (
+        "ODOO_USERNAME=new@example.com\nODOO_API_KEY=key-new\n")

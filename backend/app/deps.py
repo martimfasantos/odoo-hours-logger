@@ -45,6 +45,8 @@ def odoo() -> OdooClient:
         visitor_uuid=s.ODOO_VISITOR_UUID,
         user_id=s.ODOO_USER_ID,
         network_member_id=s.ODOO_NETWORK_MEMBER_ID,
+        login=s.ODOO_USERNAME,
+        api_key=s.ODOO_API_KEY,
     )
 
 

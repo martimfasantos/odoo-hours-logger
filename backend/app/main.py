@@ -155,6 +155,8 @@ def _settings_to_config(s: Settings) -> ConfigValues:
         GOOGLE_CALENDAR_URL=s.GOOGLE_CALENDAR_URL,
         ODOO_URL=s.ODOO_URL,
         ODOO_DB=s.ODOO_DB,
+        ODOO_USERNAME=s.ODOO_USERNAME,
+        ODOO_API_KEY=s.ODOO_API_KEY,
         ODOO_SESSION_ID=s.ODOO_SESSION_ID,
         ODOO_VISITOR_UUID=s.ODOO_VISITOR_UUID,
         ODOO_USER_ID=s.ODOO_USER_ID,
