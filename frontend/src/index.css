@@ -798,6 +798,153 @@ a {
   color: var(--color-primary);
   box-shadow: var(--shadow-card);
 }
+.view-toggle--sm .view-toggle__btn {
+  font-size: 0.8rem;
+  min-height: 28px;
+  padding: 2px var(--space-2);
+}
+
+/* ============================================================
+   Stacked column chart (Analytics)
+   ============================================================ */
+.chart-card__head {
+  flex-wrap: wrap;
+}
+.chart-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.chart-chips {
+  flex-basis: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.chart-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-family: var(--font-ui);
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--color-fg);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  padding: 2px var(--space-3);
+  min-height: 28px;
+  cursor: pointer;
+  transition: background var(--transition), color var(--transition);
+}
+.chart-chip[aria-pressed="false"] {
+  color: var(--color-text-muted);
+  background: var(--color-muted);
+}
+.chart-chip[aria-pressed="false"] .contract-swatch,
+.chart-legend__item[aria-pressed="false"] .chart-legend__swatch {
+  opacity: 0.3;
+}
+.chart-chip:focus-visible,
+.chart-legend__item:focus-visible {
+  outline: 2px solid var(--color-ring);
+  outline-offset: 2px;
+}
+.chart__plot {
+  position: relative;
+}
+.chart__plot svg {
+  display: block;
+}
+.chart-grid {
+  stroke: var(--color-border);
+  shape-rendering: crispEdges;
+}
+.chart-zero {
+  stroke: var(--color-text-muted);
+  stroke-opacity: 0.5;
+  shape-rendering: crispEdges;
+}
+.chart-axis {
+  font-size: 11px;
+  fill: var(--color-text-muted);
+}
+.chart-hover {
+  fill: var(--color-row-hover);
+}
+.chart-col {
+  fill: transparent;
+  outline: none;
+}
+.chart-tip {
+  position: absolute;
+  z-index: 5;
+  pointer-events: none;
+  min-width: 160px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-pop);
+  padding: var(--space-2) var(--space-3);
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+.chart-tip__title {
+  font-weight: 600;
+  color: var(--color-fg);
+  margin-bottom: var(--space-1);
+}
+.chart-tip__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-text-muted);
+}
+.chart-tip__row strong {
+  min-width: 64px;
+  text-align: right;
+  color: var(--color-fg);
+}
+.chart-tip__key {
+  width: 12px;
+  height: 3px;
+  border-radius: 2px;
+  flex: none;
+}
+.chart-tip__total {
+  border-top: 1px solid var(--color-border);
+  margin-top: var(--space-1);
+  padding-top: var(--space-1);
+}
+.chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
+  margin-top: var(--space-3);
+}
+.chart-legend__item {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-family: var(--font-ui);
+  font-size: 0.8rem;
+  color: var(--color-text);
+  background: none;
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 2px var(--space-1);
+  cursor: pointer;
+}
+.chart-legend__item[aria-pressed="false"] {
+  color: var(--color-text-muted);
+  text-decoration: line-through;
+}
+.chart-legend__swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  flex: none;
+}
 
 /* ============================================================
    Week calendar (DailyCalendar)

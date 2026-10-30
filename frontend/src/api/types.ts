@@ -106,9 +106,12 @@ export interface AnalyticsProject {
   margin_pct: number | null;
 }
 
-export interface AnalyticsWeek {
-  week_start: string;
+export interface AnalyticsEntry {
+  date: string; // local YYYY-MM-DD of the entry start
+  contract_id: number;
   hours: number;
+  revenue: number;
+  cost: number;
 }
 
 export interface AnalyticsTotals {
@@ -122,7 +125,7 @@ export interface AnalyticsTotals {
 export interface AnalyticsResponse {
   projects: AnalyticsProject[];
   totals: AnalyticsTotals;
-  weekly: AnalyticsWeek[];
+  entries: AnalyticsEntry[];
   currency: string;
 }
 

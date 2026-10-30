@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { ToastProvider } from "../components/Toast";
 import Analytics from "./Analytics";
 
@@ -23,9 +23,10 @@ const RESP = {
     },
   ],
   totals: { hours: 10, revenue: 600, cost: 330, margin: 270, margin_pct: 45 },
-  weekly: [
-    { week_start: "2026-06-01", hours: 6 },
-    { week_start: "2026-06-08", hours: 4 },
+  entries: [
+    { date: "2026-06-02", contract_id: 1, hours: 4, revenue: 400, cost: 160 },
+    { date: "2026-06-03", contract_id: 2, hours: 4, revenue: 0, cost: 90 },
+    { date: "2026-06-10", contract_id: 1, hours: 2, revenue: 200, cost: 80 },
   ],
   currency: "EUR",
 };
@@ -38,10 +39,30 @@ function renderAnalytics() {
   );
 }
 
+async function loaded() {
+  const view = renderAnalytics();
+  await waitFor(() => expect(screen.getByRole("table")).toBeInTheDocument());
+  return view;
+}
+
+const columns = () => document.querySelectorAll(".chart-col");
+
+function hoverFirstColumn() {
+  fireEvent.mouseEnter(columns()[0]);
+  return screen.getByRole("tooltip");
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
+  // Default range is the 1st of this month to today: Mon Jun 1 .. Sat Jun 20 2026.
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date(2026, 5, 20, 12));
   vi.mocked(api.getColors).mockResolvedValue({});
   vi.mocked(api.analytics).mockResolvedValue(RESP);
+});
+
+afterEach(() => {
+  vi.useRealTimers();
 });
 
 describe("Analytics page", () => {
@@ -51,24 +72,63 @@ describe("Analytics page", () => {
   });
 
   it("loads and renders per-project rows + totals", async () => {
-    renderAnalytics();
-    await waitFor(() => expect(screen.getByText("Acme")).toBeInTheDocument());
-    expect(screen.getByText("Beta")).toBeInTheDocument();
-    // totals hours cell (unique)
-    expect(screen.getByText("10.0h")).toBeInTheDocument();
+    await loaded();
+    const table = screen.getByRole("table");
+    expect(within(table).getByText("Acme")).toBeInTheDocument();
+    expect(within(table).getByText("Beta")).toBeInTheDocument();
+    expect(within(table).getByText("10.0h")).toBeInTheDocument();
     // zero-revenue project renders dashes for rate/margin%
-    expect(screen.getAllByText("—").length).toBeGreaterThan(0);
+    expect(within(table).getAllByText("—").length).toBeGreaterThan(0);
     expect(api.analytics).toHaveBeenCalled();
   });
 
-  it("renders one weekly bar per week", async () => {
-    renderAnalytics();
-    await waitFor(() => expect(screen.getByText("Acme")).toBeInTheDocument());
-    expect(document.querySelectorAll(".bar-row").length).toBe(2);
+  it("switching granularity changes the number of columns", async () => {
+    await loaded();
+    expect(columns().length).toBe(3); // weeks of Jun 1, 8, 15
+    fireEvent.click(screen.getByRole("button", { name: "Day" }));
+    expect(columns().length).toBe(20);
+    fireEvent.click(screen.getByRole("button", { name: "Month" }));
+    expect(columns().length).toBe(1);
+  });
+
+  it("toggling a project chip removes it from the chart and the table totals", async () => {
+    await loaded();
+    expect(hoverFirstColumn()).toHaveTextContent("Beta");
+
+    const chips = screen.getByRole("group", { name: "Projects" });
+    fireEvent.click(within(chips).getByRole("button", { name: "Beta" }));
+
+    const table = screen.getByRole("table");
+    expect(within(table).queryByText("Beta")).not.toBeInTheDocument();
+    const totalRow = within(table).getByText("Total").closest("tr")!;
+    expect(totalRow).toHaveTextContent("6.0h");
+    expect(totalRow).toHaveTextContent("€240");
+    expect(hoverFirstColumn()).not.toHaveTextContent("Beta");
+    expect(screen.getByRole("tooltip")).toHaveTextContent("4.0hAcme");
+  });
+
+  it("the metric switch changes the tooltip units", async () => {
+    await loaded();
+    expect(hoverFirstColumn()).toHaveTextContent("8.0hTotal");
+    fireEvent.click(screen.getByRole("button", { name: "Revenue" }));
+    const tip = hoverFirstColumn();
+    expect(tip).toHaveTextContent("€400Acme");
+    expect(tip).not.toHaveTextContent(/\dh/);
+  });
+
+  it("clicking a legend entry hides that series", async () => {
+    await loaded();
+    const legend = screen.getByRole("group", { name: "Series" });
+    const acme = within(legend).getByRole("button", { name: "Acme" });
+    fireEvent.click(acme);
+    expect(acme).toHaveAttribute("aria-pressed", "false");
+    const tip = hoverFirstColumn();
+    expect(tip).not.toHaveTextContent("Acme");
+    expect(tip).toHaveTextContent("4.0hBeta");
   });
 
   it("shows the empty state when there are no projects", async () => {
-    vi.mocked(api.analytics).mockResolvedValue({ ...RESP, projects: [] });
+    vi.mocked(api.analytics).mockResolvedValue({ ...RESP, projects: [], entries: [] });
     renderAnalytics();
     await waitFor(() =>
       expect(screen.getByText(/No logged entries in this range/i)).toBeInTheDocument()
