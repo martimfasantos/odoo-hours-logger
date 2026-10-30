@@ -57,7 +57,7 @@ async function loadAndPick(title: string, contractId: string) {
       </LogHoursProvider>
     </ToastProvider>,
   );
-  await userEvent.click(screen.getByRole("button", { name: /Refresh from calendar/i }));
+  await userEvent.click(screen.getByRole("button", { name: /^Refresh/i }));
   await screen.findByText("Weekly Standup");
   await userEvent.selectOptions(contractSelect(title), contractId);
 }
