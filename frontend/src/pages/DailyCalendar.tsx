@@ -11,6 +11,7 @@ import {
   formatWeekRange,
 } from "../lib/dates";
 import { colorForContract, UNASSIGNED_COLOR } from "../lib/colors";
+import { rowKey } from "../lib/rows";
 
 interface RowState {
   contractId: number | null;
@@ -33,8 +34,6 @@ const HOUR_PX = 48;
 const MIN_BLOCK_PX = 22;
 const DEFAULT_START = 8;
 const DEFAULT_END = 19;
-
-const rowKey = (p: ProposedEntry) => `${p.event.uid}|${p.event.start}`;
 
 /** A proposal enriched with its resolved contract + display color + geometry. */
 interface ResolvedEvent {
