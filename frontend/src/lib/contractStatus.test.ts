@@ -9,10 +9,6 @@ const CONTRACTS: OdooRef[] = [
 ];
 
 describe("contractStatus", () => {
-  it("is none without a contract id", () => {
-    expect(contractStatus(null, CONTRACTS, "2026-06-01")).toEqual({ kind: "none" });
-  });
-
   it("is missing when the id is not in the contracts list", () => {
     expect(contractStatus(2056, CONTRACTS, "2026-06-01")).toEqual({ kind: "missing" });
   });

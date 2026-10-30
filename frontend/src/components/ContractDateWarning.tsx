@@ -17,6 +17,7 @@ export default function ContractDateWarning({
   contracts,
   date,
 }: ContractDateWarningProps) {
+  if (contractId == null) return null;
   const s = contractStatus(contractId, contracts, date);
   let text: string;
   if (s.kind === "ended") text = `Contract ended ${formatMonthDay(s.endDate)}`;

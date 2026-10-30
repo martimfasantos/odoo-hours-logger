@@ -3,7 +3,6 @@ import { formatMonthDay } from "./dates";
 
 export type ContractStatus =
   | { kind: "ok" }
-  | { kind: "none" }
   | { kind: "missing" }
   | { kind: "ended"; endDate: string }
   | { kind: "not_started"; startDate: string };
@@ -15,11 +14,10 @@ export function endedOn(c: OdooRef, onDate: string): string | null {
 
 /** Whether `contractId` is a usable contract on `onDate` (ISO YYYY-MM-DD). */
 export function contractStatus(
-  contractId: number | null,
+  contractId: number,
   contracts: OdooRef[],
   onDate: string,
 ): ContractStatus {
-  if (contractId == null) return { kind: "none" };
   const c = contracts.find((x) => x.id === contractId);
   if (!c) return { kind: "missing" };
   const ended = endedOn(c, onDate);

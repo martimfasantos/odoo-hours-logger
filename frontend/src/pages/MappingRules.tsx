@@ -13,8 +13,6 @@ import { formatMonthDay, toISODate } from "../lib/dates";
 /** Why a rule can't assign hours today, or null when its contract is usable. */
 function ruleWarning(s: ContractStatus): string | null {
   switch (s.kind) {
-    case "none":
-      return "No contract";
     case "missing":
       return "Not in your contracts";
     case "ended":
@@ -174,13 +172,12 @@ export default function MappingRules() {
   async function handleFixContract(rule: Rule, value: string) {
     const contract = contracts.find((c) => c.id === Number(value));
     if (!contract) return;
+    const { id, ...fields } = rule;
     try {
-      await api.updateRule(rule.id, {
-        name: rule.name,
-        keywords: rule.keywords,
+      await api.updateRule(id, {
+        ...fields,
         contract_id: contract.id,
         contract_name: contract.name,
-        active: rule.active,
       });
       toast.success("Rule updated.");
       await fetchRules();
@@ -552,7 +549,7 @@ export default function MappingRules() {
                       <td>
                         {rule.contract_name}
                         {warning && (
-                          <div className="contract-pick" style={{ marginTop: 4 }}>
+                          <div className="contract-pick rule-contract-fix">
                             <Badge variant="warning">
                               <AlertTriangle size={12} aria-hidden="true" />
                               {warning}
