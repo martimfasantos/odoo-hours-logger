@@ -543,16 +543,9 @@ export default function DailyView() {
                 setToDate(to);
               }}
             />
-            <Button
-              variant="primary"
-              className="btn--icon"
-              onClick={refresh}
-              loading={loading}
-              disabled={loading}
-              aria-label="Refresh from calendar"
-              title="Refresh from calendar"
-            >
+            <Button variant="primary" onClick={refresh} loading={loading} disabled={loading}>
               {!loading && <RefreshCw size={16} aria-hidden="true" />}
+              Refresh
             </Button>
             <div className="toolbar__end">
               {testResult && (
