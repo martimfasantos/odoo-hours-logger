@@ -9,7 +9,6 @@ interface DateRangePickerProps {
   to: string;
   /** Called once per committed range, never on the first day click. */
   onChange: (from: string, to: string) => void;
-  label?: string;
 }
 
 /** The open popover; `null` while closed. */
@@ -24,12 +23,14 @@ const WEEKDAYS = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"];
 
 const asDate = (iso: string) => new Date(`${iso}T00:00:00`);
 
-export default function DateRangePicker({
-  from,
-  to,
-  onChange,
-  label = "From – To",
-}: DateRangePickerProps) {
+const DAY_LABEL = new Intl.DateTimeFormat(undefined, {
+  weekday: "long",
+  month: "long",
+  day: "numeric",
+  year: "numeric",
+});
+
+export default function DateRangePicker({ from, to, onChange }: DateRangePickerProps) {
   const [open, setOpen] = useState<OpenState | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -79,7 +80,7 @@ export default function DateRangePicker({
   return (
     <div className="drp" ref={rootRef}>
       <span className="sr-only" id={`${id}-label`}>
-        {label}
+        From – To
       </span>
       <button
         ref={triggerRef}
@@ -162,12 +163,7 @@ export default function DateRangePicker({
                     key={day}
                     type="button"
                     className={classes}
-                    aria-label={asDate(day).toLocaleDateString(undefined, {
-                      weekday: "long",
-                      month: "long",
-                      day: "numeric",
-                      year: "numeric",
-                    })}
+                    aria-label={DAY_LABEL.format(asDate(day))}
                     aria-pressed={inRange}
                     onClick={() => pick(open, day)}
                     onMouseEnter={() => preview(open, day)}

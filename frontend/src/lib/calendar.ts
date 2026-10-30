@@ -1,6 +1,6 @@
 import { addDays, addMonths, endOfMonth, startOfMonth, startOfWeek, toISODate } from "./dates";
 
-export interface PresetRange {
+interface PresetRange {
   label: string;
   from: string;
   to: string;
