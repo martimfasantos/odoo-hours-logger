@@ -4,7 +4,7 @@ import { rowKey } from "./rows";
 
 export type RuleSavePlan =
   | { kind: "create"; payload: RuleCreate }
-  | { kind: "update"; id: number; name: string; payload: RuleCreate }
+  | { kind: "update"; id: number; payload: RuleCreate }
   | { kind: "exists"; name: string };
 
 /**
@@ -39,7 +39,6 @@ export function planRuleSave(
   return {
     kind: "update",
     id,
-    name: rule.name,
     payload: { ...rule, keywords: [...rule.keywords, keyword] },
   };
 }

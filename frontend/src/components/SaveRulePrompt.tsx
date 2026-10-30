@@ -38,7 +38,7 @@ export default function SaveRulePrompt({
         toast.success("Rule saved");
       } else if (plan.kind === "update") {
         await api.updateRule(plan.id, plan.payload);
-        toast.success(`Keyword added to ${plan.name}`);
+        toast.success(`Keyword added to ${plan.payload.name}`);
       } else {
         toast.info(`${plan.name} already has that keyword`);
       }

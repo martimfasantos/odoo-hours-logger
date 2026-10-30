@@ -40,7 +40,6 @@ describe("planRuleSave", () => {
     expect(planRuleSave(rules, "Standup", BETA)).toEqual({
       kind: "update",
       id: 3,
-      name: "Rule 3",
       payload: {
         name: "Rule 3",
         keywords: ["beta", "Standup"],
