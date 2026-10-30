@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { isUnreachableError, isSessionExpiredError, isApiKeyError } from "./errors";
+import { isUnreachableError, isOdooAuthError } from "./errors";
 
 describe("isUnreachableError", () => {
   it("returns true for an Error whose message contains 'VPN'", () => {
@@ -48,36 +48,29 @@ describe("isUnreachableError", () => {
   });
 });
 
-describe("isSessionExpiredError", () => {
-  it("matches the 'session expired' phrase (case-insensitive)", () => {
-    expect(isSessionExpiredError(new Error("Odoo session expired — paste a fresh…"))).toBe(true);
-    expect(isSessionExpiredError("SESSION EXPIRED")).toBe(true);
-  });
-
+describe("isOdooAuthError", () => {
   it("matches a 401 status string", () => {
-    expect(isSessionExpiredError("401: Unauthorized")).toBe(true);
-    expect(isSessionExpiredError(new Error("401: session gone"))).toBe(true);
+    expect(isOdooAuthError("401: Unauthorized")).toBe(true);
+    expect(isOdooAuthError(new Error("401: anything"))).toBe(true);
   });
 
-  it("returns false for VPN / 503 unreachable errors", () => {
-    expect(isSessionExpiredError(new Error("503: check your VPN"))).toBe(false);
+  it("matches both backend sign-in messages in a per-row push error", () => {
+    expect(
+      isOdooAuthError(
+        "Odoo rejected your API key — create a new one in Odoo and paste it into Settings → Odoo API key."
+      )
+    ).toBe(true);
+    expect(isOdooAuthError("Add your Odoo login and API key in Settings.")).toBe(true);
+  });
+
+  it("returns false for VPN / 503 unreachable errors and other failures", () => {
+    expect(isOdooAuthError(new Error("503: check your VPN"))).toBe(false);
+    expect(isOdooAuthError("No network_member linked to this user")).toBe(false);
   });
 
   it("returns false for null, undefined and empty string", () => {
-    expect(isSessionExpiredError(null)).toBe(false);
-    expect(isSessionExpiredError(undefined)).toBe(false);
-    expect(isSessionExpiredError("")).toBe(false);
-  });
-
-  it("matches a rejected API key in a per-row push error", () => {
-    expect(isSessionExpiredError("Odoo rejected your API key — create a new one")).toBe(true);
-  });
-});
-
-describe("isApiKeyError", () => {
-  it("is true for the rejected-API-key message and false for an expired session", () => {
-    expect(isApiKeyError("401: Odoo rejected your API key — create a new one")).toBe(true);
-    expect(isApiKeyError("401: Odoo session expired — copy a fresh session_id")).toBe(false);
-    expect(isApiKeyError(null)).toBe(false);
+    expect(isOdooAuthError(null)).toBe(false);
+    expect(isOdooAuthError(undefined)).toBe(false);
+    expect(isOdooAuthError("")).toBe(false);
   });
 });

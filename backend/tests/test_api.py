@@ -13,7 +13,7 @@ from app.excluded import ExcludedStore
 from app.ignore import IgnoreStore
 from app.ledger import Ledger
 from app.main import app
-from app.odoo_client import OdooClient, OdooUnreachable, OdooSessionExpired
+from app.odoo_client import OdooClient, OdooUnreachable, OdooAuthError
 from app.rules import RulesStore
 from app.schemas import CalendarEvent, OdooRef
 
@@ -37,7 +37,8 @@ def client(tmp_path, monkeypatch):
         GOOGLE_CALENDAR_URL="https://example.com/calendar.ics",
         ODOO_URL="https://odoo.example.com",
         ODOO_DB="odoo",
-        ODOO_SESSION_ID="sess-123",
+        ODOO_USERNAME="me@example.com",
+        ODOO_API_KEY="key-abc",
         DEMO_MODE=False,
         DATA_DIR=str(tmp_path),
     )
@@ -160,7 +161,6 @@ def demo_client(tmp_path):
         GOOGLE_CALENDAR_URL="",
         ODOO_URL="",
         ODOO_DB="",
-        ODOO_SESSION_ID="",
         DEMO_MODE=True,
         DATA_DIR=str(tmp_path),
     )
@@ -349,7 +349,7 @@ def test_proposals_tolerate_odoo_failure(client, monkeypatch):
         hours=0.5, date=Date(2026, 6, 1),
     )
     monkeypatch.setattr("app.main._load_events", lambda start, end, settings, user_email="": [ev])
-    fake_odoo.existing_entries.side_effect = RuntimeError("session gone")
+    fake_odoo.existing_entries.side_effect = RuntimeError("Odoo down")
 
     resp = c.get("/api/calendar/events?start=2026-06-01&end=2026-06-01")
     assert resp.status_code == 200
@@ -603,7 +603,7 @@ def test_contracts_rejected_api_key_returns_401_naming_the_key(client):
 
     c, _, _ = client
     app.dependency_overrides[deps.odoo] = lambda: OdooClient(
-        base_url="https://odoo.example.com", session_id="", local_tz="Europe/Lisbon",
+        base_url="https://odoo.example.com", local_tz="Europe/Lisbon",
         db="odoo", login="me@example.com", api_key="bad-key",
         http_client=RejectingHttp())
     resp = c.get("/api/odoo/contracts")
@@ -618,7 +618,6 @@ def test_odoo_dep_uses_api_key_from_settings(monkeypatch):
         _env_file=None, ODOO_URL="https://odoo.example.com", ODOO_DB="odoo",
         ODOO_USERNAME="me@example.com", ODOO_API_KEY="key-abc"))
     odoo = deps.odoo.__wrapped__()
-    assert odoo.uses_api_key is True
     assert (odoo.login, odoo.api_key) == ("me@example.com", "key-abc")
 
 
@@ -634,9 +633,11 @@ def test_config_get_returns_editable_keys(client):
     body = resp.json()
     assert isinstance(body["DEMO_MODE"], bool)
     assert body["DEMO_MODE"] is False
-    assert "ODOO_SESSION_ID" in body
-    assert "GOOGLE_CALENDAR_URL" in body
-    assert "ODOO_URL" in body
+    assert set(body) == {
+        "GOOGLE_CALENDAR_URL", "ODOO_URL", "ODOO_DB", "ODOO_USERNAME",
+        "ODOO_API_KEY", "ODOO_NETWORK_MEMBER_ID", "LOCAL_TZ", "USER_EMAIL",
+        "DEMO_MODE",
+    }
 
 
 def test_config_put_writes_env_file_and_returns_200(client, tmp_path, monkeypatch):
@@ -644,11 +645,11 @@ def test_config_put_writes_env_file_and_returns_200(client, tmp_path, monkeypatc
     import app.env_file as ef
 
     env_file_path = tmp_path / ".env"
-    env_file_path.write_text("ODOO_SESSION_ID=oldtoken\nODOO_URL=https://old.example.com\n")
+    env_file_path.write_text("ODOO_DB=olddb\nODOO_URL=https://old.example.com\n")
     monkeypatch.setattr(ef, "ENV_PATH", env_file_path)
 
     c, _, _ = client
-    resp = c.put("/api/config", json={"ODOO_SESSION_ID": "newtoken", "DEMO_MODE": False})
+    resp = c.put("/api/config", json={"ODOO_DB": "newdb", "DEMO_MODE": False})
     assert resp.status_code == 200
     body = resp.json()
     # DEMO_MODE must always be returned as a bool
@@ -656,7 +657,7 @@ def test_config_put_writes_env_file_and_returns_200(client, tmp_path, monkeypatc
 
     # Verify the tmp .env was updated correctly
     written = env_file_path.read_text()
-    assert "ODOO_SESSION_ID=newtoken" in written
+    assert "ODOO_DB=newdb" in written
     assert "DEMO_MODE=false" in written
     # Existing unrelated line preserved
     assert "ODOO_URL=https://old.example.com" in written

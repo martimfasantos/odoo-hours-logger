@@ -24,9 +24,6 @@ const FULL_CONFIG: ConfigValues = {
   ODOO_DB: "mydb",
   ODOO_USERNAME: "me@example.com",
   ODOO_API_KEY: "key-abc",
-  ODOO_SESSION_ID: "sess-abc-123",
-  ODOO_VISITOR_UUID: "uuid-xyz",
-  ODOO_USER_ID: 7,
   ODOO_NETWORK_MEMBER_ID: 99,
   LOCAL_TZ: "Europe/Lisbon",
   USER_EMAIL: "user@example.com",
@@ -148,26 +145,26 @@ describe("Settings page", () => {
     expect(link).toHaveAttribute("href", "https://odoo.example.com/web?debug=1");
   });
 
-  it("locks the session-cookie fields while a login and API key are set", async () => {
+  it("opens the API key guide when no key is saved yet", async () => {
+    vi.mocked(api.getConfig).mockResolvedValue({ ...FULL_CONFIG, ODOO_API_KEY: "" });
     renderSettings();
-    const session = await screen.findByLabelText("Odoo Session ID");
-    await waitFor(() => expect(session).toHaveValue("sess-abc-123"));
-    expect(session).toBeDisabled();
-    expect(screen.getByLabelText("Odoo Visitor UUID")).toBeDisabled();
-    expect(screen.getByLabelText("Odoo User ID")).toBeDisabled();
-    expect(screen.getByLabelText("Odoo Network Member ID")).toBeEnabled();
-    expect(screen.getAllByText("Not used while an Odoo API key is set.")).toHaveLength(3);
-    expect(screen.queryByText("How to get a fresh session ID")).not.toBeInTheDocument();
+    const guide = screen.getByText("How to get an Odoo API key").closest("details")!;
+    await waitFor(() => expect(guide).toHaveAttribute("open"));
   });
 
-  it("unlocks the session-cookie fields when the API key is cleared", async () => {
-    const user = userEvent.setup();
+  it("keeps the API key guide closed when a key is saved", async () => {
     renderSettings();
-    const key = await screen.findByLabelText("Odoo API key");
-    await waitFor(() => expect(key).toHaveValue("key-abc"));
-    await user.clear(key);
-    expect(screen.getByLabelText("Odoo Session ID")).toBeEnabled();
-    expect(screen.getByText("How to get a fresh session ID")).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByLabelText("Odoo API key")).toHaveValue("key-abc"));
+    const guide = screen.getByText("How to get an Odoo API key").closest("details")!;
+    expect(guide).not.toHaveAttribute("open");
+  });
+
+  it("has no session-cookie fields", async () => {
+    renderSettings();
+    await waitFor(() => expect(screen.getByLabelText("Odoo Database")).toHaveValue("mydb"));
+    expect(screen.queryByLabelText("Odoo Session ID")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Odoo Visitor UUID")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Odoo User ID")).not.toBeInTheDocument();
   });
 
   it("shows the developer-mode step as plain text when ODOO_URL is empty", async () => {

@@ -11,26 +11,19 @@ export function isUnreachableError(err: unknown): boolean {
 }
 
 /**
- * Detect whether an error indicates Odoo rejected our credentials: an expired
- * session cookie or a rejected API key.
+ * Detect whether an error indicates Odoo sign-in failed: no login/API key set
+ * yet, or a rejected API key.
  *
  * The contracts endpoint returns HTTP 401 with the backend's message, so `req`
- * throws `Error("401: Odoo session expired — ...")` (or "Odoo rejected your API
- * key — ..."). A push may instead surface the message in a per-row error
- * string. Match either phrase or a 401 status (the only 401 the backend raises
- * is an auth failure).
+ * throws `Error("401: ...")`. A push instead surfaces the backend message in a
+ * per-row error string, so match either message as well as a 401 status (the
+ * only 401 the backend raises is a sign-in failure).
  */
-export function isSessionExpiredError(err: unknown): boolean {
+export function isOdooAuthError(err: unknown): boolean {
   const s = String(err);
   return (
-    /session expired/i.test(s) ||
-    isApiKeyError(s) ||
+    /rejected your API key|Odoo login and API key/i.test(s) ||
     s.startsWith("401") ||
     s.startsWith("Error: 401")
   );
-}
-
-/** Whether an auth failure is a rejected Odoo API key (not an expired session). */
-export function isApiKeyError(err: unknown): boolean {
-  return /rejected your API key/i.test(String(err));
 }

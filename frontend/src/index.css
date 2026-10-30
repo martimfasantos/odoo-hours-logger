@@ -1556,11 +1556,6 @@ tr:last-child .row-menu {
   z-index: 1;
   border-right: none;
 }
-.field-reveal__input:disabled {
-  background: var(--color-muted);
-  color: var(--color-text-muted);
-  cursor: not-allowed;
-}
 .field-reveal__eye {
   display: inline-flex;
   align-items: center;

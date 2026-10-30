@@ -159,9 +159,6 @@ class ConfigValues(BaseModel):
     ODOO_DB: Optional[str] = None
     ODOO_USERNAME: Optional[str] = None
     ODOO_API_KEY: Optional[str] = None
-    ODOO_SESSION_ID: Optional[str] = None
-    ODOO_VISITOR_UUID: Optional[str] = None
-    ODOO_USER_ID: Optional[int] = None
     ODOO_NETWORK_MEMBER_ID: Optional[int] = None
     LOCAL_TZ: Optional[str] = None
     USER_EMAIL: Optional[str] = None

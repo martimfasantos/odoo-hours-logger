@@ -135,7 +135,7 @@ describe("DailyView page", () => {
     });
   });
 
-  it("shows API-key copy, not session-ID steps, when Odoo rejects the API key", async () => {
+  it("shows the Odoo sign-in modal when Odoo rejects the API key", async () => {
     vi.mocked(api.contracts).mockRejectedValue(
       new Error(
         '401: {"detail":"Odoo rejected your API key — create a new one in Odoo and paste it into Settings → Odoo API key."}'
@@ -143,18 +143,7 @@ describe("DailyView page", () => {
     );
     renderDailyView();
     expect(
-      await screen.findByRole("heading", { name: "Odoo API key rejected" })
-    ).toBeInTheDocument();
-    expect(screen.queryByText(/session_id/)).not.toBeInTheDocument();
-  });
-
-  it("shows the session-ID steps when the Odoo session expired", async () => {
-    vi.mocked(api.contracts).mockRejectedValue(
-      new Error('401: {"detail":"Odoo session expired — copy a fresh session_id"}')
-    );
-    renderDailyView();
-    expect(
-      await screen.findByRole("heading", { name: "Odoo session expired" })
+      await screen.findByRole("heading", { name: "Odoo sign-in failed" })
     ).toBeInTheDocument();
   });
 

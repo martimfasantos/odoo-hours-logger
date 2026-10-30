@@ -132,9 +132,6 @@ export interface ConfigValues {
   ODOO_DB: string;
   ODOO_USERNAME: string;
   ODOO_API_KEY: string;
-  ODOO_SESSION_ID: string;
-  ODOO_VISITOR_UUID: string;
-  ODOO_USER_ID: number | null;
   ODOO_NETWORK_MEMBER_ID: number | null;
   LOCAL_TZ: string;
   USER_EMAIL: string;
