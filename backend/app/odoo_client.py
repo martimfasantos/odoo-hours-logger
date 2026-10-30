@@ -76,8 +76,7 @@ class OdooClient:
         data = resp.json()
         if data.get("error"):
             message = _error_message(data["error"])
-            # A bad key on execute_kw comes back as AccessDenied ("Access Denied").
-            if "access denied" in message.lower():
+            if (data["error"].get("data") or {}).get("name") == "odoo.exceptions.AccessDenied":
                 raise OdooAuthError(_API_KEY_REJECTED_MSG)
             raise RuntimeError(message)
         return data.get("result")
