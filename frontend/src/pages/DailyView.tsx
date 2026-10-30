@@ -545,57 +545,61 @@ export default function DailyView() {
             />
             <Button
               variant="primary"
+              className="btn--icon"
               onClick={refresh}
               loading={loading}
               disabled={loading}
+              aria-label="Refresh from calendar"
+              title="Refresh from calendar"
             >
               {!loading && <RefreshCw size={16} aria-hidden="true" />}
-              Refresh from calendar
             </Button>
-            <Button
-              variant="secondary"
-              onClick={runTest}
-              loading={testing}
-              disabled={testing}
-            >
-              {!testing && <PlugZap size={16} aria-hidden="true" />}
-              Test connection
-            </Button>
-            {testResult && (
-              <div
-                className="conn-row__status"
-                style={{ gap: "var(--space-3)", flexWrap: "wrap" }}
-                aria-live="polite"
+            <div className="toolbar__end">
+              {testResult && (
+                <div
+                  className="conn-row__status"
+                  style={{ gap: "var(--space-3)", flexWrap: "wrap" }}
+                  aria-live="polite"
+                >
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: "var(--space-1)" }}>
+                    Odoo
+                    <Badge variant={testResult.odoo ? "active" : "inactive"}>
+                      {testResult.odoo ? (
+                        <Check size={12} aria-hidden="true" />
+                      ) : (
+                        <X size={12} aria-hidden="true" />
+                      )}
+                      {testResult.odoo ? "OK" : "Down"}
+                    </Badge>
+                  </span>
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: "var(--space-1)" }}>
+                    Google Calendar
+                    <Badge variant={testResult.calendar ? "active" : "inactive"}>
+                      {testResult.calendar ? (
+                        <Check size={12} aria-hidden="true" />
+                      ) : (
+                        <X size={12} aria-hidden="true" />
+                      )}
+                      {testResult.calendar ? "OK" : "Down"}
+                    </Badge>
+                  </span>
+                  {(testResult.errors.odoo || testResult.errors.calendar) && (
+                    <p className="conn-error" style={{ margin: 0, flexBasis: "100%" }}>
+                      {testResult.errors.odoo || testResult.errors.calendar}
+                    </p>
+                  )}
+                </div>
+              )}
+              <Button
+                variant="secondary"
+                onClick={runTest}
+                loading={testing}
+                disabled={testing}
               >
-                <span style={{ display: "inline-flex", alignItems: "center", gap: "var(--space-1)" }}>
-                  Odoo
-                  <Badge variant={testResult.odoo ? "active" : "inactive"}>
-                    {testResult.odoo ? (
-                      <Check size={12} aria-hidden="true" />
-                    ) : (
-                      <X size={12} aria-hidden="true" />
-                    )}
-                    {testResult.odoo ? "OK" : "Down"}
-                  </Badge>
-                </span>
-                <span style={{ display: "inline-flex", alignItems: "center", gap: "var(--space-1)" }}>
-                  Google Calendar
-                  <Badge variant={testResult.calendar ? "active" : "inactive"}>
-                    {testResult.calendar ? (
-                      <Check size={12} aria-hidden="true" />
-                    ) : (
-                      <X size={12} aria-hidden="true" />
-                    )}
-                    {testResult.calendar ? "OK" : "Down"}
-                  </Badge>
-                </span>
-                {(testResult.errors.odoo || testResult.errors.calendar) && (
-                  <p className="conn-error" style={{ margin: 0, flexBasis: "100%" }}>
-                    {testResult.errors.odoo || testResult.errors.calendar}
-                  </p>
-                )}
-              </div>
-            )}
+                {!testing && <PlugZap size={16} aria-hidden="true" />}
+                Test connection
+              </Button>
+            </div>
           </div>
         </div>
       </div>

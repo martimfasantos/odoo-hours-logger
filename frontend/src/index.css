@@ -278,6 +278,14 @@ a {
   align-items: center;
   gap: var(--space-4);
 }
+.toolbar__end {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-4);
+  margin-left: auto;
+}
 
 .field {
   display: flex;
@@ -587,6 +595,10 @@ a {
   border-color: var(--color-danger);
 }
 
+.btn--icon {
+  width: 38px;
+  padding: 0;
+}
 .btn--sm {
   min-height: 30px;
   padding: 0 var(--space-3);
