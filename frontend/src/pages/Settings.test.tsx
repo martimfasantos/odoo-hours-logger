@@ -148,6 +148,28 @@ describe("Settings page", () => {
     expect(link).toHaveAttribute("href", "https://odoo.example.com/web?debug=1");
   });
 
+  it("locks the session-cookie fields while a login and API key are set", async () => {
+    renderSettings();
+    const session = await screen.findByLabelText("Odoo Session ID");
+    await waitFor(() => expect(session).toHaveValue("sess-abc-123"));
+    expect(session).toBeDisabled();
+    expect(screen.getByLabelText("Odoo Visitor UUID")).toBeDisabled();
+    expect(screen.getByLabelText("Odoo User ID")).toBeDisabled();
+    expect(screen.getByLabelText("Odoo Network Member ID")).toBeEnabled();
+    expect(screen.getAllByText("Not used while an Odoo API key is set.")).toHaveLength(3);
+    expect(screen.queryByText("How to get a fresh session ID")).not.toBeInTheDocument();
+  });
+
+  it("unlocks the session-cookie fields when the API key is cleared", async () => {
+    const user = userEvent.setup();
+    renderSettings();
+    const key = await screen.findByLabelText("Odoo API key");
+    await waitFor(() => expect(key).toHaveValue("key-abc"));
+    await user.clear(key);
+    expect(screen.getByLabelText("Odoo Session ID")).toBeEnabled();
+    expect(screen.getByText("How to get a fresh session ID")).toBeInTheDocument();
+  });
+
   it("shows the developer-mode step as plain text when ODOO_URL is empty", async () => {
     vi.mocked(api.getConfig).mockResolvedValue({ ...FULL_CONFIG, ODOO_URL: "" });
     renderSettings();

@@ -33,7 +33,7 @@ All configuration lives in **`backend/.env`**. You can edit it two ways:
 | `ODOO_URL` | **Yes** | `https://erp.daredata.engineering` |
 | `ODOO_DB` | **Yes** | `odoo` |
 | `ODOO_USERNAME` | With an API key | Your Odoo login email. |
-| `ODOO_API_KEY` | No (recommended) | An Odoo API key. With this and `ODOO_USERNAME` set, the session cookie is not used. Odoo only shows the API-key section in developer mode: open `<ODOO_URL>/web?debug=1` → avatar → **My Profile** → **Account Security** → **Developer API Keys** → **New API Key** (confirm your password; copy the key, it is shown once). Clear it to go back to `ODOO_SESSION_ID`. |
+| `ODOO_API_KEY` | No (recommended) | An Odoo API key. With this and `ODOO_USERNAME` set, `ODOO_SESSION_ID`, `ODOO_VISITOR_UUID` and `ODOO_USER_ID` are not used (Settings locks them). Odoo only shows the API-key section in developer mode: open `<ODOO_URL>/web?debug=1` → avatar → **My Profile** → **Account Security** → **Developer API Keys** → **New API Key** (confirm your password; copy the key, it is shown once). Clear it to go back to `ODOO_SESSION_ID`. |
 | `ODOO_SESSION_ID` | Without an API key | Your live Odoo session cookie. In a logged-in Odoo browser tab: DevTools → Application → Cookies → copy `session_id`. **It expires** (logout / server restart / re-login) — re-paste a fresh one in the Settings tab when the connection test fails. |
 | `ODOO_VISITOR_UUID` | No | The `visitor_uuid` cookie (optional; leave blank if absent). |
 | `ODOO_USER_ID` | No | Auto-discovered from the session. Set only to override. |

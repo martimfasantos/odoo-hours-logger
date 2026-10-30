@@ -346,15 +346,10 @@ def test_api_key_call_kw_uses_execute_kw():
     })
 
 
-def test_api_key_user_id_override_skips_authenticate():
-    c, http = _client([_ok([])], user_id=7, **API_KEY)
-    c.call_kw("contract", "search_read", [[]])
-    assert http.calls == [("https://odoo.example.com/jsonrpc", {
-        "jsonrpc": "2.0", "method": "call",
-        "params": {"service": "object", "method": "execute_kw",
-                   "args": ["odoo", 7, "key-abc", "contract", "search_read",
-                            [[]], {}]},
-    })]
+def test_api_key_ignores_user_id_override():
+    c, http = _client([_ok(1098)], user_id=7, **API_KEY)
+    assert c.uid() == 1098
+    assert http.calls[0][1]["params"]["method"] == "authenticate"
 
 
 def test_api_key_rejected_when_authenticate_returns_false():
@@ -365,10 +360,10 @@ def test_api_key_rejected_when_authenticate_returns_false():
 
 
 def test_api_key_access_denied_raises_api_key_error():
-    c, _ = _client([FakeResponse({"error": {
+    c, _ = _client([_ok(7), FakeResponse({"error": {
         "message": "Odoo Server Error",
         "data": {"name": "odoo.exceptions.AccessDenied", "message": "Access Denied"},
-    }})], user_id=7, **API_KEY)
+    }})], **API_KEY)
     with pytest.raises(OdooSessionExpired) as excinfo:
         c.call_kw("contract", "search_read", [[]])
     assert str(excinfo.value) == API_KEY_REJECTED
@@ -397,7 +392,7 @@ def test_session_cookie_sent_only_without_api_key():
     assert session.cookies == {"session_id": "sess-123"}
     assert session.headers["X-Openerp-Session-Id"] == "sess-123"
 
-    api_key = build(**API_KEY)
+    api_key = build(visitor_uuid="visitor-1", **API_KEY)
     assert api_key.cookies == {}
     assert "X-Openerp-Session-Id" not in api_key.headers
 

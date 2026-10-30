@@ -70,8 +70,6 @@ class OdooClient:
             self._auth_hints = _EXPIRED_HINTS
 
         cookies = {}
-        if visitor_uuid:
-            cookies["visitor_uuid"] = visitor_uuid
         headers = {
             "Referer": f"{self.base_url}/web",
             "Content-Type": "application/json",
@@ -79,6 +77,8 @@ class OdooClient:
         if not self.uses_api_key:
             cookies["session_id"] = session_id
             headers["X-Openerp-Session-Id"] = session_id
+            if visitor_uuid:
+                cookies["visitor_uuid"] = visitor_uuid
         if http_client is None:
             # Short connect timeout so an unreachable Odoo (e.g. VPN off) fails
             # fast and surfaces the "check your VPN" prompt quickly; allow a
@@ -139,7 +139,8 @@ class OdooClient:
         return self._call("/web/session/get_session_info", {})
 
     def uid(self) -> int:
-        if self._user_id_override:
+        # With an API key, authenticate is the only check that the key works.
+        if self._user_id_override and not self.uses_api_key:
             return self._user_id_override
         if self._uid is None:
             if self.uses_api_key:

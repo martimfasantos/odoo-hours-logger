@@ -31,6 +31,13 @@ const MASKED_STRING_FIELDS: (keyof ConfigValues)[] = [
   "USER_EMAIL",
 ];
 
+// Session-cookie fields the backend ignores once a login + API key are set.
+const API_KEY_UNUSED_FIELDS: (keyof ConfigValues)[] = [
+  "ODOO_SESSION_ID",
+  "ODOO_VISITOR_UUID",
+  "ODOO_USER_ID",
+];
+
 const FIELD_LABELS: Record<string, string> = {
   GOOGLE_CALENDAR_URL: "Google Calendar URL",
   ODOO_URL: "Odoo URL",
@@ -233,6 +240,7 @@ export default function Settings() {
 
   const odooUrl = form.ODOO_URL.trim().replace(/\/+$/, "");
   const debugUrl = odooUrl ? `${odooUrl}/web?debug=1` : "";
+  const usesApiKey = Boolean(form.ODOO_USERNAME.trim() && form.ODOO_API_KEY.trim());
 
   return (
     <div className="page">
@@ -363,25 +371,27 @@ export default function Settings() {
               </li>
             </ol>
           </details>
-          <details className="field-reveal__note">
-            <summary style={{ cursor: "pointer", fontWeight: 600 }}>
-              How to get a fresh session ID
-            </summary>
-            <ol style={{ margin: "8px 0 0", paddingLeft: "20px", lineHeight: 1.6 }}>
-              <li>Open Odoo in your browser and log in (VPN on).</li>
-              <li>
-                Open DevTools (<kbd>⌥⌘I</kbd>) → <b>Application</b> →{" "}
-                <b>Cookies</b> → your Odoo domain.
-              </li>
-              <li>
-                Copy the value of the <code>session_id</code> cookie.
-              </li>
-              <li>
-                Paste it into the <b>Odoo Session ID</b> field below, then{" "}
-                <b>Save settings</b>.
-              </li>
-            </ol>
-          </details>
+          {!usesApiKey && (
+            <details className="field-reveal__note">
+              <summary style={{ cursor: "pointer", fontWeight: 600 }}>
+                How to get a fresh session ID
+              </summary>
+              <ol style={{ margin: "8px 0 0", paddingLeft: "20px", lineHeight: 1.6 }}>
+                <li>Open Odoo in your browser and log in (VPN on).</li>
+                <li>
+                  Open DevTools (<kbd>⌥⌘I</kbd>) → <b>Application</b> →{" "}
+                  <b>Cookies</b> → your Odoo domain.
+                </li>
+                <li>
+                  Copy the value of the <code>session_id</code> cookie.
+                </li>
+                <li>
+                  Paste it into the <b>Odoo Session ID</b> field below, then{" "}
+                  <b>Save settings</b>.
+                </li>
+              </ol>
+            </details>
+          )}
           <form onSubmit={handleSave} noValidate>
             <div className="config-form">
               {MASKED_STRING_FIELDS.map((fieldKey) => {
@@ -389,6 +399,7 @@ export default function Settings() {
                 const isRevealed = !!revealed[fieldKey];
                 const label = FIELD_LABELS[fieldKey] ?? fieldKey;
                 const inputId = `cfg-${fieldKey}`;
+                const locked = usesApiKey && API_KEY_UNUSED_FIELDS.includes(fieldKey);
                 return (
                   <div className="field field--full" key={fieldKey}>
                     <label className="field__label" htmlFor={inputId}>
@@ -402,7 +413,7 @@ export default function Settings() {
                         value={form[key] as string}
                         autoComplete="off"
                         spellCheck={false}
-                        disabled={configLoading}
+                        disabled={configLoading || locked}
                         onChange={(e) =>
                           setForm((f) => ({ ...f, [key]: e.target.value }))
                         }
@@ -423,6 +434,11 @@ export default function Settings() {
                         )}
                       </button>
                     </div>
+                    {locked && (
+                      <span className="field__hint">
+                        Not used while an Odoo API key is set.
+                      </span>
+                    )}
                   </div>
                 );
               })}
