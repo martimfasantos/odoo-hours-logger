@@ -2,7 +2,7 @@ from collections import defaultdict
 from datetime import date as Date
 
 from app.schemas import (
-    AnalyticsEntry, AnalyticsProject, AnalyticsResponse, AnalyticsTotals,
+    AnalyticsEntry, AnalyticsProject, AnalyticsResponse,
     CalendarEvent, ContractTotal, ProposedEntry,
 )
 
@@ -41,19 +41,23 @@ def build_analytics(entries: list[dict], rates: dict[int, dict],
     each so the client can bucket them by any period.
     """
     agg: dict[int, dict] = {}
-    total_hours = 0.0
+    rows: list[AnalyticsEntry] = []
     for e in entries:
         cid = e.get("contract_id")
         if cid is None:
             continue
+        hours = e.get("duration_h", 0.0) or 0.0
+        revenue = e.get("external_cost", 0.0) or 0.0
+        cost = e.get("internal_cost", 0.0) or 0.0
         b = agg.setdefault(cid, {
             "name": e.get("contract_name") or f"Contract {cid}",
             "hours": 0.0, "revenue": 0.0, "cost": 0.0,
         })
-        b["hours"] += e.get("duration_h", 0.0) or 0.0
-        b["revenue"] += e.get("external_cost", 0.0) or 0.0
-        b["cost"] += e.get("internal_cost", 0.0) or 0.0
-        total_hours += e.get("duration_h", 0.0) or 0.0
+        b["hours"] += hours
+        b["revenue"] += revenue
+        b["cost"] += cost
+        rows.append(AnalyticsEntry(date=e["local_date"], contract_id=cid,
+                                   hours=hours, revenue=revenue, cost=cost))
 
     projects: list[AnalyticsProject] = []
     for cid, b in agg.items():
@@ -63,7 +67,6 @@ def build_analytics(entries: list[dict], rates: dict[int, dict],
             contract_id=cid,
             contract_name=b["name"],
             hours=round(b["hours"], 2),
-            allocation_pct=round(b["hours"] / total_hours * 100, 1) if total_hours else 0.0,
             internal_rate=r.get("internal_rate"),
             external_rate=r.get("external_rate"),
             revenue=round(b["revenue"], 2),
@@ -73,25 +76,4 @@ def build_analytics(entries: list[dict], rates: dict[int, dict],
         ))
     projects.sort(key=lambda p: p.revenue, reverse=True)
 
-    tot_rev = round(sum(p.revenue for p in projects), 2)
-    tot_cost = round(sum(p.cost for p in projects), 2)
-    tot_margin = round(tot_rev - tot_cost, 2)
-    totals = AnalyticsTotals(
-        hours=round(total_hours, 2),
-        revenue=tot_rev, cost=tot_cost, margin=tot_margin,
-        margin_pct=round(tot_margin / tot_rev * 100, 1) if tot_rev else None,
-    )
-
-    rows = [
-        AnalyticsEntry(
-            date=e["local_date"], contract_id=e["contract_id"],
-            hours=e.get("duration_h", 0.0) or 0.0,
-            revenue=e.get("external_cost", 0.0) or 0.0,
-            cost=e.get("internal_cost", 0.0) or 0.0,
-        )
-        for e in entries
-        if e.get("contract_id") is not None and e.get("local_date") is not None
-    ]
-
-    return AnalyticsResponse(projects=projects, totals=totals,
-                             entries=rows, currency=currency)
+    return AnalyticsResponse(projects=projects, entries=rows, currency=currency)

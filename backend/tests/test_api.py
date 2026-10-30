@@ -99,7 +99,6 @@ def test_analytics_endpoint(client):
     assert body["projects"][0]["contract_id"] == 10
     assert body["projects"][0]["revenue"] == 400.0
     assert body["projects"][0]["external_rate"] == 100.0
-    assert body["totals"]["hours"] == 4.0
     assert body["currency"] == "EUR"
     assert body["entries"] == [{"date": "2026-06-01", "contract_id": 10,
                                 "hours": 4.0, "revenue": 400.0, "cost": 160.0}]

@@ -27,15 +27,8 @@ def test_build_analytics_aggregates_per_project():
     assert by_id[1].margin == 360.0
     assert by_id[1].margin_pct == 60.0
     assert by_id[1].external_rate == 100.0
-    # allocation: contract 1 has 6 of 10 total hours
-    assert by_id[1].allocation_pct == 60.0
-    assert by_id[2].allocation_pct == 40.0
     # contract 2 had no rates provided
     assert by_id[2].external_rate is None
-
-    assert res.totals.hours == 10.0
-    assert res.totals.revenue == 900.0
-    assert res.totals.margin == 460.0
     # projects sorted by revenue desc
     assert res.projects[0].contract_id == 1
 
@@ -46,7 +39,6 @@ def test_build_analytics_zero_revenue_margin_pct_none():
     assert res.projects[0].revenue == 0.0
     assert res.projects[0].margin == -90.0
     assert res.projects[0].margin_pct is None
-    assert res.totals.margin_pct is None
 
 
 def test_build_analytics_returns_one_entry_row_per_logged_entry():
@@ -67,6 +59,4 @@ def test_build_analytics_returns_one_entry_row_per_logged_entry():
 def test_build_analytics_empty():
     res = build_analytics([], {})
     assert res.projects == []
-    assert res.totals.hours == 0.0
-    assert res.totals.margin_pct is None
     assert res.entries == []

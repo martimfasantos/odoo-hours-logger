@@ -110,7 +110,6 @@ class AnalyticsProject(BaseModel):
     contract_id: int
     contract_name: str
     hours: float
-    allocation_pct: float  # 0..100
     internal_rate: Optional[float] = None
     external_rate: Optional[float] = None
     revenue: float  # sum of external_cost
@@ -120,24 +119,15 @@ class AnalyticsProject(BaseModel):
 
 
 class AnalyticsEntry(BaseModel):
-    date: Date  # local date of the entry start
-    contract_id: int
-    hours: float
-    revenue: float
-    cost: float
-
-
-class AnalyticsTotals(BaseModel):
-    hours: float
-    revenue: float
-    cost: float
-    margin: float
-    margin_pct: Optional[float] = None
+    date: Date = Field(description="Local date the entry starts on.")
+    contract_id: int = Field(description="Odoo contract the entry is logged against.")
+    hours: float = Field(description="Logged duration in hours.")
+    revenue: float = Field(description="Entry's external cost (what the client is billed).")
+    cost: float = Field(description="Entry's internal cost.")
 
 
 class AnalyticsResponse(BaseModel):
     projects: list[AnalyticsProject]
-    totals: AnalyticsTotals
     entries: list[AnalyticsEntry]
     currency: str = "EUR"
 class ExcludedEntryRef(BaseModel):
