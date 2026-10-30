@@ -153,12 +153,6 @@ def test_non_json_response_raises_runtime_error():
     assert not isinstance(excinfo.value, OdooAuthError)
 
 
-def test_user_email_is_the_login_without_a_network_call():
-    c, http = _client([])
-    assert c.user_email() == "me@example.com"
-    assert http.calls == []
-
-
 def test_list_contracts_parses_rows():
     # Use network_member_id override to avoid an extra round-trip.
     c, http = _client([_ok(UID), _ok([

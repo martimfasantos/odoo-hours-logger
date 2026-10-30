@@ -119,14 +119,14 @@ def _build_proposals(events: list[CalendarEvent], rules: list[Rule],
     return proposals
 
 
-def _resolve_user_email(settings: Settings, odoo: OdooClient) -> str:
+def _resolve_user_email(settings: Settings) -> str:
     """Return the effective user email for declined-event detection.
 
     Priority:
     1. ``settings.USER_EMAIL`` if set (explicit override).
     2. The Odoo login (``ODOO_USERNAME``).
     """
-    return settings.USER_EMAIL or odoo.user_email()
+    return settings.USER_EMAIL or settings.ODOO_USERNAME
 
 
 def _load_events(start: Date, end: Date, settings: Settings,
@@ -220,7 +220,7 @@ def calendar_events(start: Date, end: Date,
                     odoo: OdooClient = Depends(deps.odoo),
                     ignore_store: IgnoreStore = Depends(deps.ignore_store),
                     excluded_store: ExcludedStore = Depends(deps.excluded_store)):
-    user_email = settings.USER_EMAIL if settings.DEMO_MODE else _resolve_user_email(settings, odoo)
+    user_email = settings.USER_EMAIL if settings.DEMO_MODE else _resolve_user_email(settings)
     events = _load_events(start, end, settings, user_email)
     kws = ignore_store.get()
     events = [ev for ev in events if not _is_ignored(ev.title, kws)]
@@ -236,7 +236,7 @@ def daily(start: Date, end: Date,
           odoo: OdooClient = Depends(deps.odoo),
           ignore_store: IgnoreStore = Depends(deps.ignore_store),
           excluded_store: ExcludedStore = Depends(deps.excluded_store)):
-    user_email = settings.USER_EMAIL if settings.DEMO_MODE else _resolve_user_email(settings, odoo)
+    user_email = settings.USER_EMAIL if settings.DEMO_MODE else _resolve_user_email(settings)
     events = _load_events(start, end, settings, user_email)
     kws = ignore_store.get()
     events = [ev for ev in events if not _is_ignored(ev.title, kws)]
@@ -256,7 +256,7 @@ def weekly(start: Date, end: Date,
            odoo: OdooClient = Depends(deps.odoo),
            ignore_store: IgnoreStore = Depends(deps.ignore_store),
            excluded_store: ExcludedStore = Depends(deps.excluded_store)):
-    user_email = settings.USER_EMAIL if settings.DEMO_MODE else _resolve_user_email(settings, odoo)
+    user_email = settings.USER_EMAIL if settings.DEMO_MODE else _resolve_user_email(settings)
     events = _load_events(start, end, settings, user_email)
     kws = ignore_store.get()
     events = [ev for ev in events if not _is_ignored(ev.title, kws)]
@@ -312,7 +312,7 @@ def overview(start: Date, end: Date,
     logger = logging.getLogger(__name__)
 
     user_email = (settings.USER_EMAIL if settings.DEMO_MODE
-                  else _resolve_user_email(settings, odoo))
+                  else _resolve_user_email(settings))
     events = _load_events(start, end, settings, user_email)
     kws = ignore_store.get()
     events = [ev for ev in events if not _is_ignored(ev.title, kws)]

@@ -31,7 +31,6 @@ def client(tmp_path, monkeypatch):
     fake_odoo.existing_entries.return_value = []
     fake_odoo.create_timesheet.return_value = 500
     fake_odoo.test_connection.return_value = True
-    fake_odoo.user_email.return_value = "test.user@example.com"
 
     fake_settings = Settings(
         GOOGLE_CALENDAR_URL="https://example.com/calendar.ics",
@@ -147,6 +146,21 @@ def test_calendar_events_returns_502_when_ical_fails(client, monkeypatch):
     resp = c.get("/api/calendar/events?start=2026-06-01&end=2026-06-07")
     assert resp.status_code == 502
     assert "Failed to load calendar" in resp.json()["detail"]
+
+
+@pytest.mark.parametrize("user_email,expected", [
+    ("", "me@example.com"), ("cal@example.com", "cal@example.com"),
+])
+def test_declined_event_email_defaults_to_odoo_login(client, monkeypatch,
+                                                     user_email, expected):
+    c, _, _ = client
+    app.dependency_overrides[deps.settings] = lambda: Settings(
+        _env_file=None, ODOO_USERNAME="me@example.com", USER_EMAIL=user_email)
+    seen = []
+    monkeypatch.setattr("app.main._load_events",
+                        lambda start, end, settings, user_email="": seen.append(user_email) or [])
+    c.get("/api/calendar/events?start=2026-06-01&end=2026-06-01")
+    assert seen == [expected]
 
 
 @pytest.fixture

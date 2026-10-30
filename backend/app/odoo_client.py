@@ -101,9 +101,6 @@ class OdooClient:
             self._uid = uid
         return self._uid
 
-    def user_email(self) -> str:
-        return self.login
-
     def network_member_id(self) -> int:
         if self._network_member_id_override:
             return self._network_member_id_override
