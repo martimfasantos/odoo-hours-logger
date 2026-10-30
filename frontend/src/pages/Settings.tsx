@@ -345,7 +345,7 @@ export default function Settings() {
                 (your Odoo URL + <code>/web?debug=1</code>).
               </li>
               <li>
-                Click your avatar (top right) → <b>Preferences</b>.
+                Click your avatar (top right) → <b>My Profile</b>.
               </li>
               <li>
                 Open the <b>Account Security</b> tab → <b>Developer API Keys</b> →{" "}
