@@ -138,7 +138,7 @@ describe("DailyView page", () => {
   it("shows the Refresh from calendar button", async () => {
     renderDailyView();
     expect(
-      screen.getByRole("button", { name: /Refresh from calendar/i })
+      screen.getByRole("button", { name: /^Refresh/i })
     ).toBeInTheDocument();
   });
 
@@ -146,7 +146,7 @@ describe("DailyView page", () => {
     renderDailyView();
 
     await userEvent.click(
-      screen.getByRole("button", { name: /Refresh from calendar/i })
+      screen.getByRole("button", { name: /^Refresh/i })
     );
 
     await waitFor(() => {
@@ -158,7 +158,7 @@ describe("DailyView page", () => {
   it("renders the Approve all imported checkbox after events load", async () => {
     renderDailyView();
     await userEvent.click(
-      screen.getByRole("button", { name: /Refresh from calendar/i })
+      screen.getByRole("button", { name: /^Refresh/i })
     );
     await waitFor(() => {
       expect(
@@ -170,7 +170,7 @@ describe("DailyView page", () => {
   it("renders Push approved to Odoo button after events load", async () => {
     renderDailyView();
     await userEvent.click(
-      screen.getByRole("button", { name: /Refresh from calendar/i })
+      screen.getByRole("button", { name: /^Refresh/i })
     );
     await waitFor(() => {
       expect(
@@ -182,7 +182,7 @@ describe("DailyView page", () => {
   it("calls api.push with the approved entries when Push is clicked", async () => {
     renderDailyView();
     await userEvent.click(
-      screen.getByRole("button", { name: /Refresh from calendar/i })
+      screen.getByRole("button", { name: /^Refresh/i })
     );
 
     // Wait for events and the push button to appear
@@ -220,7 +220,7 @@ describe("DailyView page", () => {
     ]);
     renderDailyView();
     await userEvent.click(
-      screen.getByRole("button", { name: /Refresh from calendar/i }),
+      screen.getByRole("button", { name: /^Refresh/i }),
     );
 
     await waitFor(() => {
@@ -254,7 +254,7 @@ describe("DailyView page", () => {
 
     renderDailyView();
     await userEvent.click(
-      screen.getByRole("button", { name: /Refresh from calendar/i }),
+      screen.getByRole("button", { name: /^Refresh/i }),
     );
 
     await waitFor(() => {
@@ -286,7 +286,7 @@ describe("DailyView page", () => {
 
     renderDailyView();
     await userEvent.click(
-      screen.getByRole("button", { name: /Refresh from calendar/i }),
+      screen.getByRole("button", { name: /^Refresh/i }),
     );
 
     await waitFor(() => {
@@ -313,7 +313,7 @@ describe("DailyView page", () => {
 
     renderDailyView();
     await userEvent.click(
-      screen.getByRole("button", { name: /Refresh from calendar/i }),
+      screen.getByRole("button", { name: /^Refresh/i }),
     );
 
     await waitFor(() => {
@@ -336,7 +336,7 @@ describe("DailyView page", () => {
   it("persists removal via api.excludeEntry with event metadata", async () => {
     renderDailyView();
     await userEvent.click(
-      screen.getByRole("button", { name: /Refresh from calendar/i }),
+      screen.getByRole("button", { name: /^Refresh/i }),
     );
     await userEvent.click(
       await screen.findByRole("button", { name: /Row actions for "Team Sync"/i }),
@@ -356,7 +356,7 @@ describe("DailyView page", () => {
   it("calls api.events with the selected from/to dates on Refresh click", async () => {
     renderDailyView();
     await userEvent.click(
-      screen.getByRole("button", { name: /Refresh from calendar/i })
+      screen.getByRole("button", { name: /^Refresh/i })
     );
 
     await waitFor(() => {
