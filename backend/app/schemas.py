@@ -119,9 +119,12 @@ class AnalyticsProject(BaseModel):
     margin_pct: Optional[float] = None  # margin/revenue*100, None if revenue == 0
 
 
-class AnalyticsWeek(BaseModel):
-    week_start: Date  # Monday
+class AnalyticsEntry(BaseModel):
+    date: Date  # local date of the entry start
+    contract_id: int
     hours: float
+    revenue: float
+    cost: float
 
 
 class AnalyticsTotals(BaseModel):
@@ -135,7 +138,7 @@ class AnalyticsTotals(BaseModel):
 class AnalyticsResponse(BaseModel):
     projects: list[AnalyticsProject]
     totals: AnalyticsTotals
-    weekly: list[AnalyticsWeek]
+    entries: list[AnalyticsEntry]
     currency: str = "EUR"
 class ExcludedEntryRef(BaseModel):
     uid: str

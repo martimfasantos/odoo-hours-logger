@@ -306,7 +306,7 @@ def analytics(start: Date, end: Date,
         rates = odoo.contract_rates(list(contract_ids))
     except (OdooUnreachable, OdooSessionExpired):
         rates = {}
-    return build_analytics(entries, rates, start, end)
+    return build_analytics(entries, rates)
 
 
 @app.get("/api/overview", response_model=OverviewResponse)
