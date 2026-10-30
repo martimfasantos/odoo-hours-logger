@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ToastProvider } from "../components/Toast";
@@ -117,6 +117,10 @@ beforeEach(() => {
     odoo_unreachable: false,
     errors: {},
   });
+});
+
+afterEach(() => {
+  vi.useRealTimers();
 });
 
 describe("DailyView page", () => {
@@ -322,22 +326,21 @@ describe("DailyView page", () => {
     );
   });
 
-  it("calls api.events with the selected from/to dates on Refresh click", async () => {
+  it("calls api.events with the range picked in the date picker on Refresh click", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(2026, 9, 30, 12));
     renderDailyView();
+    await userEvent.click(screen.getByRole("button", { name: /From – To/ }));
+    await userEvent.click(screen.getByRole("button", { name: "Wednesday, October 28, 2026" }));
+    await userEvent.click(screen.getByRole("button", { name: "Monday, October 26, 2026" }));
+    expect(api.events).not.toHaveBeenCalled();
+
     await userEvent.click(
       screen.getByRole("button", { name: /Refresh from calendar/i })
     );
-
     await waitFor(() => {
-      expect(api.events).toHaveBeenCalled();
+      expect(api.events).toHaveBeenCalledWith("2026-10-26", "2026-10-28");
     });
-
-    const [start, end] = vi.mocked(api.events).mock.calls[0];
-    // Both default to today which is a non-empty string
-    expect(typeof start).toBe("string");
-    expect(start.length).toBeGreaterThan(0);
-    expect(typeof end).toBe("string");
-    expect(end.length).toBeGreaterThan(0);
   });
 });
 

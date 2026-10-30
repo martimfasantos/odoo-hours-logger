@@ -14,6 +14,7 @@ import Badge from "../components/Badge";
 import Spinner from "../components/Spinner";
 import VpnModal from "../components/VpnModal";
 import SessionExpiredModal from "../components/SessionExpiredModal";
+import DateRangePicker from "../components/DateRangePicker";
 import DailyCalendar from "./DailyCalendar";
 import { colorForContract, UNASSIGNED_COLOR } from "../lib/colors";
 import { isUnreachableError, isSessionExpiredError } from "../lib/errors";
@@ -534,32 +535,14 @@ export default function DailyView() {
       <div className="card">
         <div className="card__pad">
           <div className="toolbar">
-            <div className="field">
-              <label className="field__label" htmlFor="daily-from">
-                From
-              </label>
-              <input
-                id="daily-from"
-                type="date"
-                className="input"
-                value={fromDate}
-                onChange={(e) => setFromDate(e.target.value)}
-              />
-              <span className="field__hint">(inclusive)</span>
-            </div>
-            <div className="field">
-              <label className="field__label" htmlFor="daily-to">
-                To
-              </label>
-              <input
-                id="daily-to"
-                type="date"
-                className="input"
-                value={toDate}
-                onChange={(e) => setToDate(e.target.value)}
-              />
-              <span className="field__hint">(inclusive)</span>
-            </div>
+            <DateRangePicker
+              from={fromDate}
+              to={toDate}
+              onChange={(from, to) => {
+                setFromDate(from);
+                setToDate(to);
+              }}
+            />
             <Button
               variant="primary"
               onClick={refresh}
