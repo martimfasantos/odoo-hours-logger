@@ -22,6 +22,8 @@ const FULL_CONFIG: ConfigValues = {
   GOOGLE_CALENDAR_URL: "https://calendar.google.com/feed",
   ODOO_URL: "https://odoo.example.com",
   ODOO_DB: "mydb",
+  ODOO_USERNAME: "me@example.com",
+  ODOO_API_KEY: "key-abc",
   ODOO_SESSION_ID: "sess-abc-123",
   ODOO_VISITOR_UUID: "uuid-xyz",
   ODOO_USER_ID: 7,
@@ -120,9 +122,40 @@ describe("Settings page", () => {
         expect.objectContaining({
           ODOO_URL: FULL_CONFIG.ODOO_URL,
           ODOO_DB: FULL_CONFIG.ODOO_DB,
+          ODOO_USERNAME: "me@example.com",
+          ODOO_API_KEY: "key-abc",
         })
       );
     });
+  });
+
+  it("renders the Odoo login and API key fields masked with their saved values", async () => {
+    renderSettings();
+    const key = await screen.findByLabelText("Odoo API key");
+    await waitFor(() => expect(key).toHaveValue("key-abc"));
+    expect(key).toHaveAttribute("type", "password");
+    expect(screen.getByLabelText("Odoo login (email)")).toHaveValue("me@example.com");
+  });
+
+  it("links the API key walkthrough to Odoo developer mode built from ODOO_URL", async () => {
+    vi.mocked(api.getConfig).mockResolvedValue({
+      ...FULL_CONFIG,
+      ODOO_URL: "https://odoo.example.com/",
+    });
+    renderSettings();
+    expect(screen.getByText("How to get an Odoo API key")).toBeInTheDocument();
+    const link = await screen.findByRole("link", { name: "Open Odoo in developer mode" });
+    expect(link).toHaveAttribute("href", "https://odoo.example.com/web?debug=1");
+  });
+
+  it("shows the developer-mode step as plain text when ODOO_URL is empty", async () => {
+    vi.mocked(api.getConfig).mockResolvedValue({ ...FULL_CONFIG, ODOO_URL: "" });
+    renderSettings();
+    await waitFor(() => expect(screen.getByLabelText("Odoo Database")).toHaveValue("mydb"));
+    expect(screen.getByText(/Open Odoo in developer mode/)).toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: "Open Odoo in developer mode" })
+    ).not.toBeInTheDocument();
   });
 
   it("calls api.testConnection when Test connection is clicked", async () => {

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { isUnreachableError, isSessionExpiredError } from "./errors";
+import { isUnreachableError, isSessionExpiredError, isApiKeyError } from "./errors";
 
 describe("isUnreachableError", () => {
   it("returns true for an Error whose message contains 'VPN'", () => {
@@ -67,5 +67,17 @@ describe("isSessionExpiredError", () => {
     expect(isSessionExpiredError(null)).toBe(false);
     expect(isSessionExpiredError(undefined)).toBe(false);
     expect(isSessionExpiredError("")).toBe(false);
+  });
+
+  it("matches a rejected API key in a per-row push error", () => {
+    expect(isSessionExpiredError("Odoo rejected your API key — create a new one")).toBe(true);
+  });
+});
+
+describe("isApiKeyError", () => {
+  it("is true for the rejected-API-key message and false for an expired session", () => {
+    expect(isApiKeyError("401: Odoo rejected your API key — create a new one")).toBe(true);
+    expect(isApiKeyError("401: Odoo session expired — copy a fresh session_id")).toBe(false);
+    expect(isApiKeyError(null)).toBe(false);
   });
 });

@@ -18,6 +18,16 @@ describe("SessionExpiredModal", () => {
     expect(screen.getByText(/Odoo Session ID/i)).toBeInTheDocument();
   });
 
+  it("points to a new API key instead of a session ID when apiKey is set", () => {
+    render(<SessionExpiredModal open={true} apiKey onClose={vi.fn()} />);
+    expect(
+      screen.getByRole("heading", { name: "Odoo API key rejected" })
+    ).toBeInTheDocument();
+    expect(screen.getByText("Settings → Odoo API key")).toBeInTheDocument();
+    expect(screen.queryByText(/session_id/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Odoo Session ID/)).not.toBeInTheDocument();
+  });
+
   it("links Open Settings to the Settings tab", () => {
     render(<SessionExpiredModal open={true} onClose={vi.fn()} />);
     expect(screen.getByRole("link", { name: /Open Settings/i })).toHaveAttribute(

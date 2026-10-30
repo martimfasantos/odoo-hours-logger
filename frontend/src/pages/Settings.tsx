@@ -21,6 +21,8 @@ const MASKED_STRING_FIELDS: (keyof ConfigValues)[] = [
   "GOOGLE_CALENDAR_URL",
   "ODOO_URL",
   "ODOO_DB",
+  "ODOO_USERNAME",
+  "ODOO_API_KEY",
   "ODOO_SESSION_ID",
   "ODOO_VISITOR_UUID",
   "ODOO_USER_ID",
@@ -33,6 +35,8 @@ const FIELD_LABELS: Record<string, string> = {
   GOOGLE_CALENDAR_URL: "Google Calendar URL",
   ODOO_URL: "Odoo URL",
   ODOO_DB: "Odoo Database",
+  ODOO_USERNAME: "Odoo login (email)",
+  ODOO_API_KEY: "Odoo API key",
   ODOO_SESSION_ID: "Odoo Session ID",
   ODOO_VISITOR_UUID: "Odoo Visitor UUID",
   ODOO_USER_ID: "Odoo User ID",
@@ -47,6 +51,8 @@ interface ConfigFormState {
   GOOGLE_CALENDAR_URL: string;
   ODOO_URL: string;
   ODOO_DB: string;
+  ODOO_USERNAME: string;
+  ODOO_API_KEY: string;
   ODOO_SESSION_ID: string;
   ODOO_VISITOR_UUID: string;
   ODOO_USER_ID: string;
@@ -60,6 +66,8 @@ const EMPTY_FORM: ConfigFormState = {
   GOOGLE_CALENDAR_URL: "",
   ODOO_URL: "",
   ODOO_DB: "",
+  ODOO_USERNAME: "",
+  ODOO_API_KEY: "",
   ODOO_SESSION_ID: "",
   ODOO_VISITOR_UUID: "",
   ODOO_USER_ID: "",
@@ -74,6 +82,8 @@ function configToForm(cfg: ConfigValues): ConfigFormState {
     GOOGLE_CALENDAR_URL: cfg.GOOGLE_CALENDAR_URL,
     ODOO_URL: cfg.ODOO_URL,
     ODOO_DB: cfg.ODOO_DB,
+    ODOO_USERNAME: cfg.ODOO_USERNAME,
+    ODOO_API_KEY: cfg.ODOO_API_KEY,
     ODOO_SESSION_ID: cfg.ODOO_SESSION_ID,
     ODOO_VISITOR_UUID: cfg.ODOO_VISITOR_UUID,
     ODOO_USER_ID: cfg.ODOO_USER_ID !== null ? String(cfg.ODOO_USER_ID) : "",
@@ -92,6 +102,8 @@ function formToPayload(form: ConfigFormState): Partial<ConfigValues> {
     GOOGLE_CALENDAR_URL: form.GOOGLE_CALENDAR_URL,
     ODOO_URL: form.ODOO_URL,
     ODOO_DB: form.ODOO_DB,
+    ODOO_USERNAME: form.ODOO_USERNAME,
+    ODOO_API_KEY: form.ODOO_API_KEY,
     ODOO_SESSION_ID: form.ODOO_SESSION_ID,
     ODOO_VISITOR_UUID: form.ODOO_VISITOR_UUID,
     ODOO_USER_ID:
@@ -219,6 +231,9 @@ export default function Settings() {
     setRevealed((prev) => ({ ...prev, [field]: !prev[field] }));
   }
 
+  const odooUrl = form.ODOO_URL.trim().replace(/\/+$/, "");
+  const debugUrl = odooUrl ? `${odooUrl}/web?debug=1` : "";
+
   return (
     <div className="page">
       <header className="page__header">
@@ -311,8 +326,43 @@ export default function Settings() {
           <p className="field-reveal__note">
             Changes are saved to <code>backend/.env</code> and applied
             immediately. Update <code>ODOO_SESSION_ID</code> here when your
-            session expires.
+            session expires. When an Odoo API key is set, the session ID is not
+            used; clear the key to go back to the session ID.
           </p>
+          <details className="field-reveal__note">
+            <summary style={{ cursor: "pointer", fontWeight: 600 }}>
+              How to get an Odoo API key
+            </summary>
+            <ol style={{ margin: "8px 0 0", paddingLeft: "20px", lineHeight: 1.6 }}>
+              <li>
+                {debugUrl ? (
+                  <a href={debugUrl} target="_blank" rel="noreferrer">
+                    Open Odoo in developer mode
+                  </a>
+                ) : (
+                  "Open Odoo in developer mode"
+                )}{" "}
+                (your Odoo URL + <code>/web?debug=1</code>).
+              </li>
+              <li>
+                Click your avatar (top right) → <b>Preferences</b>.
+              </li>
+              <li>
+                Open the <b>Account Security</b> tab → <b>Developer API Keys</b> →{" "}
+                <b>New API Key</b>.
+              </li>
+              <li>Confirm your Odoo password when asked.</li>
+              <li>
+                Name it (e.g. "Hours Logger") and generate it. Copy the key now;
+                Odoo shows it only once.
+              </li>
+              <li>
+                Paste it into <b>Odoo API key</b> below, check{" "}
+                <b>Odoo login (email)</b> is your Odoo email, <b>Save settings</b>,
+                then <b>Test connection</b>.
+              </li>
+            </ol>
+          </details>
           <details className="field-reveal__note">
             <summary style={{ cursor: "pointer", fontWeight: 600 }}>
               How to get a fresh session ID
