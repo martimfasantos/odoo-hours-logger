@@ -43,10 +43,6 @@ export default function Analytics() {
   }, []);
 
   async function load() {
-    if (from > to) {
-      toast.error('"From" must be on or before "To".');
-      return;
-    }
     setLoading(true);
     try {
       setData(await api.analytics(from, to));

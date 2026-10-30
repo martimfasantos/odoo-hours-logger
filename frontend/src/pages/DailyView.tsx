@@ -272,16 +272,10 @@ export default function DailyView() {
   }
 
   async function refresh() {
-    const rangeStart = fromDate;
-    const rangeEnd = toDate;
-    if (rangeStart > rangeEnd) {
-      toast.error("\"From\" must be on or before \"To\".");
-      return;
-    }
     setLoading(true);
     setResults({});
     try {
-      const data = await api.events(rangeStart, rangeEnd);
+      const data = await api.events(fromDate, toDate);
       setProposals(data);
       setHasFetched(true);
       setCalendarWeekStart(startOfWeek(new Date(`${fromDate}T00:00:00`)));
