@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ToastProvider } from "../components/Toast";
 import { LogHoursProvider } from "../state/LogHoursContext";
@@ -210,6 +210,37 @@ describe("DailyView page", () => {
     expect(calledWith[1]).toMatchObject({
       uid: "ev-2",
       contract_id: 20,
+    });
+  });
+
+  it("warns on a row whose contract ended before the event, without blocking push", async () => {
+    vi.mocked(api.contracts).mockResolvedValue([
+      { id: 10, name: "Acme Corp", start_date: "2025-06-01", end_date: "2026-05-31" },
+      { id: 20, name: "Beta Ltd", start_date: null, end_date: null },
+    ]);
+    renderDailyView();
+    await userEvent.click(
+      screen.getByRole("button", { name: /Refresh from calendar/i }),
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("Contract ended May 31")).toBeInTheDocument();
+    });
+    expect(screen.getAllByText(/^Contract (ended|starts)/)).toHaveLength(1);
+    const select = screen.getByRole("combobox", { name: "Contract for Team Sync" });
+    expect(
+      within(select).getAllByRole("option").map((o) => o.textContent),
+    ).toEqual(["— Select contract —", "Acme Corp (ended May 31)", "Beta Ltd"]);
+
+    await userEvent.click(
+      screen.getByRole("button", { name: /Push approved to Odoo/i }),
+    );
+    await waitFor(() => {
+      expect(api.push).toHaveBeenCalledTimes(1);
+    });
+    expect(vi.mocked(api.push).mock.calls[0][0][0]).toMatchObject({
+      uid: "ev-1",
+      contract_id: 10,
     });
   });
 

@@ -41,6 +41,14 @@ export function formatDayHeading(iso: string): string {
   });
 }
 
+/** "Sep 18" style label from a YYYY-MM-DD string. */
+export function formatMonthDay(iso: string): string {
+  return new Date(`${iso}T00:00:00`).toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+  });
+}
+
 /** Format a number of hours compactly, e.g. 1.5 -> "1.5h", 2 -> "2h". */
 export function formatHours(h: number): string {
   return `${Number(h.toFixed(2))}h`;

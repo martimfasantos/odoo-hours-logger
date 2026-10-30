@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Plus, Pencil, Trash2, X, Check } from "lucide-react";
+import { Plus, Pencil, Trash2, X, Check, AlertTriangle } from "lucide-react";
 import { api } from "../api/client";
 import type { OdooRef, Rule, RuleCreate } from "../api/types";
 import { useToast } from "../components/Toast";
@@ -7,6 +7,23 @@ import Button from "../components/Button";
 import Badge from "../components/Badge";
 import Spinner from "../components/Spinner";
 import { PALETTE, colorForContract } from "../lib/colors";
+import { contractStatus, endedOn, type ContractStatus } from "../lib/contractStatus";
+import { formatMonthDay, toISODate } from "../lib/dates";
+
+/** Why a rule can't assign hours today, or null when its contract is usable. */
+function ruleWarning(s: ContractStatus): string | null {
+  switch (s.kind) {
+    case "none":
+      return "No contract";
+    case "missing":
+      return "Not in your contracts";
+    case "ended":
+      return `Ended ${formatMonthDay(s.endDate)}`;
+    case "ok":
+    case "not_started":
+      return null;
+  }
+}
 
 interface FormState {
   name: string;
@@ -154,6 +171,24 @@ export default function MappingRules() {
     }
   }
 
+  async function handleFixContract(rule: Rule, value: string) {
+    const contract = contracts.find((c) => c.id === Number(value));
+    if (!contract) return;
+    try {
+      await api.updateRule(rule.id, {
+        name: rule.name,
+        keywords: rule.keywords,
+        contract_id: contract.id,
+        contract_name: contract.name,
+        active: rule.active,
+      });
+      toast.success("Rule updated.");
+      await fetchRules();
+    } catch (err) {
+      toast.error(`Failed to save rule: ${String(err)}`);
+    }
+  }
+
   function startEdit(rule: Rule) {
     setEditId(rule.id);
     setErrors({});
@@ -222,6 +257,9 @@ export default function MappingRules() {
       setDeletingId(null);
     }
   }
+
+  const today = toISODate(new Date());
+  const currentContracts = contracts.filter((c) => !endedOn(c, today));
 
   return (
     <div className="page">
@@ -495,50 +533,80 @@ export default function MappingRules() {
                 </tr>
               </thead>
               <tbody>
-                {rules.map((rule) => (
-                  <tr key={rule.id}>
-                    <td>{rule.name}</td>
-                    <td>
-                      <div className="keyword-chips">
-                        {rule.keywords.map((kw) => (
-                          <span key={kw} className="chip">{kw}</span>
-                        ))}
-                      </div>
-                    </td>
-                    <td>{rule.contract_name}</td>
-                    <td>
-                      <Badge variant={rule.active ? "active" : "inactive"}>
-                        {rule.active ? "Active" : "Inactive"}
-                      </Badge>
-                    </td>
-                    <td>
-                      <div className="actions-cell">
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          aria-label={`Edit ${rule.name}`}
-                          onClick={() => startEdit(rule)}
-                        >
-                          <Pencil size={14} aria-hidden="true" />
-                          Edit
-                        </Button>
-                        <Button
-                          variant="danger"
-                          size="sm"
-                          aria-label={`Delete ${rule.name}`}
-                          loading={deletingId === rule.id}
-                          disabled={deletingId !== null}
-                          onClick={() => handleDelete(rule.id)}
-                        >
-                          {deletingId !== rule.id && (
-                            <Trash2 size={14} aria-hidden="true" />
-                          )}
-                          Delete
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                {rules.map((rule) => {
+                  // An empty list means contracts haven't loaded (or failed), not that every rule is stale.
+                  const warning =
+                    contracts.length > 0
+                      ? ruleWarning(contractStatus(rule.contract_id, contracts, today))
+                      : null;
+                  return (
+                    <tr key={rule.id}>
+                      <td>{rule.name}</td>
+                      <td>
+                        <div className="keyword-chips">
+                          {rule.keywords.map((kw) => (
+                            <span key={kw} className="chip">{kw}</span>
+                          ))}
+                        </div>
+                      </td>
+                      <td>
+                        {rule.contract_name}
+                        {warning && (
+                          <div className="contract-pick" style={{ marginTop: 4 }}>
+                            <Badge variant="warning">
+                              <AlertTriangle size={12} aria-hidden="true" />
+                              {warning}
+                            </Badge>
+                            <select
+                              className="select select--cell"
+                              aria-label={`Fix contract for ${rule.name}`}
+                              value=""
+                              onChange={(e) => handleFixContract(rule, e.target.value)}
+                            >
+                              <option value="">Reassign…</option>
+                              {currentContracts.map((c) => (
+                                <option key={c.id} value={c.id}>
+                                  {c.name}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        )}
+                      </td>
+                      <td>
+                        <Badge variant={rule.active ? "active" : "inactive"}>
+                          {rule.active ? "Active" : "Inactive"}
+                        </Badge>
+                      </td>
+                      <td>
+                        <div className="actions-cell">
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            aria-label={`Edit ${rule.name}`}
+                            onClick={() => startEdit(rule)}
+                          >
+                            <Pencil size={14} aria-hidden="true" />
+                            Edit
+                          </Button>
+                          <Button
+                            variant="danger"
+                            size="sm"
+                            aria-label={`Delete ${rule.name}`}
+                            loading={deletingId === rule.id}
+                            disabled={deletingId !== null}
+                            onClick={() => handleDelete(rule.id)}
+                          >
+                            {deletingId !== rule.id && (
+                              <Trash2 size={14} aria-hidden="true" />
+                            )}
+                            Delete
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
