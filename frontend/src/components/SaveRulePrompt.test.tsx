@@ -147,6 +147,16 @@ describe("Save rule prompt on Log Hours", () => {
     expect(save).toBeDisabled();
   });
 
+  it("closes when the calendar is re-fetched", async () => {
+    await loadAndPick("Weekly Standup", "20");
+    expect(keywordInput()).not.toBeNull();
+
+    await userEvent.click(screen.getByRole("button", { name: /^Refresh/i }));
+    await screen.findByText("Weekly Standup");
+    expect(contractSelect("Weekly Standup").value).toBe("");
+    expect(keywordInput()).toBeNull();
+  });
+
   it("stays hidden for a dismissed row even when its contract changes again", async () => {
     await loadAndPick("Weekly Standup", "20");
     await userEvent.click(screen.getByRole("button", { name: "Dismiss rule suggestion" }));

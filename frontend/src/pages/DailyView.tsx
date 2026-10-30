@@ -160,10 +160,7 @@ export default function DailyView() {
   const [openMenuKey, setOpenMenuKey] = useState<string | null>(null);
 
   // The row offering to save its manual contract pick as a rule.
-  const [rulePrompt, setRulePrompt] = useState<{
-    key: string;
-    contract: OdooRef;
-  } | null>(null);
+  const [rulePromptKey, setRulePromptKey] = useState<string | null>(null);
 
   // Close the open menu on outside click or Escape.
   useEffect(() => {
@@ -300,6 +297,7 @@ export default function DailyView() {
         };
       }
       setRows(init);
+      setRulePromptKey(null);
     } catch (e) {
       if (isUnreachableError(e)) setVpnOpen(true);
       toast.error(`Failed to fetch calendar: ${String(e)}`);
@@ -329,11 +327,8 @@ export default function DailyView() {
     const contractId = value ? Number(value) : null;
     const key = rowKey(p);
     setRow(key, { contractId });
-    const contract = contracts.find((c) => c.id === contractId);
-    if (contract && p.match.rule_id === null && !dismissedRulePrompts.has(key)) {
-      setRulePrompt({ key, contract });
-    } else if (rulePrompt?.key === key) {
-      setRulePrompt(null);
+    if (contractId !== null && p.match.rule_id === null && !dismissedRulePrompts.has(key)) {
+      setRulePromptKey(key);
     }
   }
 
@@ -911,6 +906,10 @@ export default function DailyView() {
                             const key = rowKey(p);
                             const r = rows[key];
                             const result = results[key];
+                            const ruleContract =
+                              rulePromptKey === key
+                                ? contracts.find((c) => c.id === r?.contractId)
+                                : undefined;
                             const rowClass = p.already_logged
                               ? "row--logged"
                               : result && !result.success
@@ -1081,13 +1080,13 @@ export default function DailyView() {
                                   </div>
                                 </td>
                               </tr>,
-                              rulePrompt?.key === key && (
+                              ruleContract && (
                                 <SaveRulePrompt
                                   key={`${key}|rule`}
                                   entry={p}
-                                  contract={rulePrompt.contract}
+                                  contract={ruleContract}
                                   colSpan={8}
-                                  onClose={() => setRulePrompt(null)}
+                                  onClose={() => setRulePromptKey(null)}
                                 />
                               ),
                             ];
