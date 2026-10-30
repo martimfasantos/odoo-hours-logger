@@ -28,6 +28,8 @@ export default function SaveRulePrompt({
   const [keyword, setKeyword] = useState(entry.event.title);
   const [saving, setSaving] = useState(false);
   const trimmed = keyword.trim();
+  // Mapping Rules edits keywords as comma-separated text, so a comma would split this one.
+  const hasComma = trimmed.includes(",");
 
   async function save() {
     setSaving(true);
@@ -69,8 +71,10 @@ export default function SaveRulePrompt({
           <span>Always map events like</span>
           <input
             type="text"
-            className="input input--cell rule-prompt__keyword"
+            className={`input input--cell rule-prompt__keyword${hasComma ? " input--invalid" : ""}`}
             aria-label="Rule keyword"
+            aria-invalid={hasComma || undefined}
+            title={hasComma ? "Keywords can't contain commas" : undefined}
             value={keyword}
             onChange={(e) => setKeyword(e.target.value)}
           />
@@ -82,7 +86,7 @@ export default function SaveRulePrompt({
             variant="primary"
             size="sm"
             loading={saving}
-            disabled={!trimmed}
+            disabled={!trimmed || hasComma}
           >
             Save rule
           </Button>

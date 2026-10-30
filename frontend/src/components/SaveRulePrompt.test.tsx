@@ -147,6 +147,13 @@ describe("Save rule prompt on Log Hours", () => {
     expect(save).toBeDisabled();
   });
 
+  it("disables Save for a keyword with a comma, which Mapping Rules would split", async () => {
+    await loadAndPick("Weekly Standup", "20");
+    await userEvent.type(keywordInput()!, ", Acme");
+    expect(screen.getByRole("button", { name: "Save rule" })).toBeDisabled();
+    expect(keywordInput()).toHaveAttribute("aria-invalid", "true");
+  });
+
   it("closes when the calendar is re-fetched", async () => {
     await loadAndPick("Weekly Standup", "20");
     expect(keywordInput()).not.toBeNull();
