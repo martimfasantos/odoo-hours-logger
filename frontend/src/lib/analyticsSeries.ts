@@ -7,9 +7,8 @@ export type GroupBy = "project" | "billable" | "none";
 export type Metric = "hours" | "revenue" | "cost" | "margin";
 
 export interface Period {
-  key: string;
+  key: string; // YYYY-MM-DD the period starts on
   label: string;
-  start: string;
 }
 
 export interface Series {
@@ -23,7 +22,6 @@ export interface SeriesOptions {
   granularity: Granularity;
   groupBy: GroupBy;
   metric: Metric;
-  includedIds: ReadonlySet<number>;
   from: string;
   to: string;
   colors: Record<string, string>;
@@ -55,7 +53,43 @@ function periodLabel(key: string, g: Granularity): string {
   );
 }
 
-/** Bucket entries into every period of [from, to] and split them into stacked series. */
+/** The stacked series for a grouping, and which series a contract's entries fall into. */
+function grouping(
+  projects: AnalyticsProject[],
+  groupBy: GroupBy,
+  colors: Record<string, string>,
+): { defs: Omit<Series, "values">[]; seriesIdOf: (cid: number) => string } {
+  switch (groupBy) {
+    case "project":
+      return {
+        defs: projects.map((p) => ({
+          id: String(p.contract_id),
+          label: p.contract_name,
+          color: colorForContract(p.contract_id, colors),
+        })),
+        seriesIdOf: String,
+      };
+    case "billable": {
+      const billable = new Set(
+        projects.filter((p) => (p.external_rate ?? 0) > 0).map((p) => p.contract_id),
+      );
+      return {
+        defs: [
+          { id: "billable", label: "Billable", color: "var(--color-secondary)" },
+          { id: "internal", label: "Internal", color: "#D97706" },
+        ],
+        seriesIdOf: (cid) => (billable.has(cid) ? "billable" : "internal"),
+      };
+    }
+    case "none":
+      return {
+        defs: [{ id: "total", label: "Total", color: "var(--color-secondary)" }],
+        seriesIdOf: () => "total",
+      };
+  }
+}
+
+/** Bucket the entries of `projects` into every period of [from, to] and split them into stacked series. */
 export function buildSeries(
   entries: AnalyticsEntry[],
   projects: AnalyticsProject[],
@@ -64,40 +98,17 @@ export function buildSeries(
   const g = opts.granularity;
   const periods: Period[] = [];
   for (let k = periodKey(opts.from, g); k <= opts.to; k = nextPeriod(k, g)) {
-    periods.push({ key: k, label: periodLabel(k, g), start: k });
+    periods.push({ key: k, label: periodLabel(k, g) });
   }
   const periodIndex = new Map(periods.map((p, i) => [p.key, i]));
 
-  const included = projects.filter((p) => opts.includedIds.has(p.contract_id));
-  const billable = new Set(
-    included.filter((p) => (p.external_rate ?? 0) > 0).map((p) => p.contract_id),
-  );
-  const defs =
-    opts.groupBy === "project"
-      ? included.map((p) => ({
-          id: String(p.contract_id),
-          label: p.contract_name,
-          color: colorForContract(p.contract_id, opts.colors),
-        }))
-      : opts.groupBy === "billable"
-        ? [
-            { id: "billable", label: "Billable", color: "var(--color-secondary)" },
-            { id: "internal", label: "Internal", color: "#D97706" },
-          ]
-        : [{ id: "total", label: "Total", color: "var(--color-secondary)" }];
-  const seriesIdOf = (cid: number) =>
-    opts.groupBy === "project"
-      ? String(cid)
-      : opts.groupBy === "billable"
-        ? billable.has(cid) ? "billable" : "internal"
-        : "total";
-
+  const included = new Set(projects.map((p) => p.contract_id));
+  const { defs, seriesIdOf } = grouping(projects, opts.groupBy, opts.colors);
   const values = new Map(defs.map((d) => [d.id, periods.map(() => 0)]));
   for (const e of entries) {
     const i = periodIndex.get(periodKey(e.date, g));
-    if (i === undefined || !opts.includedIds.has(e.contract_id)) continue;
-    const row = values.get(seriesIdOf(e.contract_id));
-    if (row) row[i] += METRIC[opts.metric](e);
+    if (i === undefined || !included.has(e.contract_id)) continue;
+    values.get(seriesIdOf(e.contract_id))![i] += METRIC[opts.metric](e);
   }
 
   const series = defs

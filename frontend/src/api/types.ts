@@ -97,7 +97,6 @@ export interface AnalyticsProject {
   contract_id: number;
   contract_name: string;
   hours: number;
-  allocation_pct: number;
   internal_rate: number | null;
   external_rate: number | null;
   revenue: number;
@@ -114,17 +113,8 @@ export interface AnalyticsEntry {
   cost: number;
 }
 
-export interface AnalyticsTotals {
-  hours: number;
-  revenue: number;
-  cost: number;
-  margin: number;
-  margin_pct: number | null;
-}
-
 export interface AnalyticsResponse {
   projects: AnalyticsProject[];
-  totals: AnalyticsTotals;
   entries: AnalyticsEntry[];
   currency: string;
 }

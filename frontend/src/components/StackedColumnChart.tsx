@@ -57,9 +57,9 @@ export default function StackedColumnChart({
   }, []);
 
   const visible = series.filter((s) => !hidden.has(s.id));
-  const totals = periods.map((_, i) => visible.reduce((sum, s) => sum + s.values[i], 0));
   const pos = periods.map((_, i) => visible.reduce((sum, s) => sum + Math.max(0, s.values[i]), 0));
   const neg = periods.map((_, i) => visible.reduce((sum, s) => sum + Math.min(0, s.values[i]), 0));
+  const totals = pos.map((p, i) => p + neg[i]);
   const ticks = niceTicks(Math.min(0, ...neg), Math.max(0, ...pos));
   const lo = ticks[0];
   const hi = ticks[ticks.length - 1];

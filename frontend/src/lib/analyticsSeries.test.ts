@@ -4,7 +4,7 @@ import { buildSeries, type SeriesOptions } from "./analyticsSeries";
 
 function project(id: number, external_rate: number | null): AnalyticsProject {
   return {
-    contract_id: id, contract_name: `P${id}`, hours: 0, allocation_pct: 0,
+    contract_id: id, contract_name: `P${id}`, hours: 0,
     internal_rate: 40, external_rate, revenue: 0, cost: 0, margin: 0, margin_pct: null,
   };
 }
@@ -24,7 +24,6 @@ const BASE: SeriesOptions = {
   granularity: "day",
   groupBy: "project",
   metric: "hours",
-  includedIds: new Set([1, 2, 3]),
   from: "2026-06-28",
   to: "2026-07-09",
   colors: {},
@@ -50,7 +49,7 @@ describe("buildSeries", () => {
 
   it("buckets by Monday-start week, starting at the week containing `from`", () => {
     const r = run({ granularity: "week" });
-    expect(r.periods.map((p) => p.start)).toEqual(["2026-06-22", "2026-06-29", "2026-07-06"]);
+    expect(r.periods.map((p) => p.key)).toEqual(["2026-06-22", "2026-06-29", "2026-07-06"]);
     expect(valuesById(r)).toEqual({ "1": [0, 5, 1], "2": [0, 1, 0], "3": [0, 1.5, 0] });
   });
 
@@ -72,13 +71,11 @@ describe("buildSeries", () => {
     expect(valuesById(r)).toEqual({ billable: [200, 400] });
   });
 
-  it("excludes filtered-out projects from every grouping", () => {
-    const included = new Set([1, 3]);
-    expect(valuesById(run({ granularity: "month", includedIds: included }))).toEqual({
-      "1": [2, 4], "3": [0, 1.5],
-    });
-    expect(
-      valuesById(run({ granularity: "month", groupBy: "none", metric: "cost", includedIds: included })),
-    ).toEqual({ total: [80, 220] });
+  it("only counts entries of the projects passed in, in every grouping", () => {
+    const shown = PROJECTS.filter((p) => p.contract_id !== 2);
+    const runShown = (o: Partial<SeriesOptions>) =>
+      buildSeries(ENTRIES, shown, { ...BASE, granularity: "month", ...o });
+    expect(valuesById(runShown({}))).toEqual({ "1": [2, 4], "3": [0, 1.5] });
+    expect(valuesById(runShown({ groupBy: "none", metric: "cost" }))).toEqual({ total: [80, 220] });
   });
 });

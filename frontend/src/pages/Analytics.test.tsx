@@ -12,17 +12,16 @@ import { api } from "../api/client";
 const RESP = {
   projects: [
     {
-      contract_id: 1, contract_name: "Acme", hours: 6, allocation_pct: 60,
+      contract_id: 1, contract_name: "Acme", hours: 6,
       internal_rate: 40, external_rate: 100, revenue: 600, cost: 240,
       margin: 360, margin_pct: 60,
     },
     {
-      contract_id: 2, contract_name: "Beta", hours: 4, allocation_pct: 40,
+      contract_id: 2, contract_name: "Beta", hours: 4,
       internal_rate: null, external_rate: null, revenue: 0, cost: 90,
       margin: -90, margin_pct: null,
     },
   ],
-  totals: { hours: 10, revenue: 600, cost: 330, margin: 270, margin_pct: 45 },
   entries: [
     { date: "2026-06-02", contract_id: 1, hours: 4, revenue: 400, cost: 160 },
     { date: "2026-06-03", contract_id: 2, hours: 4, revenue: 0, cost: 90 },

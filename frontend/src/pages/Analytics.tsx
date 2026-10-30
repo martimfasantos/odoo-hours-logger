@@ -140,11 +140,10 @@ export default function Analytics() {
   const totals = { hours: sum("hours"), revenue: sum("revenue"), cost: sum("cost") };
   const totalMargin = totals.revenue - totals.cost;
   const { periods, series } = data
-    ? buildSeries(data.response.entries, data.response.projects, {
+    ? buildSeries(data.response.entries, shown, {
         granularity: chart.granularity,
         groupBy: chart.groupBy,
         metric: chart.metric,
-        includedIds: new Set(shown.map((p) => p.contract_id)),
         from: data.from,
         to: data.to,
         colors,
