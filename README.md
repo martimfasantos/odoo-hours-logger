@@ -35,7 +35,7 @@
 - 📊 **Logged overview** — per-contract **logged vs. to-be-logged** hours, month-to-date.
 - 🧹 **Filter words** to skip non-work events (e.g. _"Out of Office"_, _"Lunch"_).
 - ⚙️ **Editable, masked settings** saved to `.env` — re-paste your Odoo session here when it expires.
-- 🔌 **Session-cookie Odoo auth** (no API key needed) with a clear **"check your VPN"** prompt when Odoo is unreachable.
+- 🔌 **Odoo API key or session-cookie auth** with a clear **"check your VPN"** prompt when Odoo is unreachable.
 - 🧪 **Demo mode** + a full test suite (**127** backend, **116** frontend).
 
 ## 📸 Screenshots
@@ -82,7 +82,8 @@ contracts and events with a simulated push (no Odoo or calendar needed). All the
 are demo mode.
 
 > **Configuration:** the key values are your Google Calendar **secret iCal URL** and your Odoo
-> **`session_id`** cookie (this Odoo has no API keys, so auth reuses your browser session — it
+> credentials: either your Odoo **login + API key** (recommended; it does not expire, and the
+> Settings tab walks you through creating one) or your browser's **`session_id`** cookie (it
 > expires, and you re-paste it in the Settings tab). Full variable reference and the technical
 > details are in **[`docs/GUIDE.md`](docs/GUIDE.md)**.
 
@@ -104,7 +105,7 @@ cd odoo-hours-logger
 cd backend && python -m venv .venv && . .venv/bin/activate && pip install -e ".[dev,packaging]"
 cd ../frontend && npm install && cd ..
 
-# 3. Configure — your Google Calendar iCal URL + Odoo session_id (or fill these in later in Settings)
+# 3. Configure — your Google Calendar iCal URL + Odoo login and API key, or session_id (or fill these in later in Settings)
 cp backend/.env.example backend/.env   # then edit backend/.env
 
 # 4. (optional) prettier app icon

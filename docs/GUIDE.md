@@ -21,8 +21,8 @@ All configuration lives in **`backend/.env`**. You can edit it two ways:
 
 - **Settings tab in the UI** (recommended) — every value is editable there, shown masked
   (password-style) with an eye toggle to reveal/edit. **Save** writes `backend/.env` and applies
-  the change immediately (no restart). This is the easiest place to **re-paste an expired
-  `ODOO_SESSION_ID`**.
+  the change immediately (no restart). This is the easiest place to **paste your Odoo API key**
+  (it has a step-by-step guide) or **re-paste an expired `ODOO_SESSION_ID`**.
 - **Editing `backend/.env` directly** — copy `backend/.env.example` to `backend/.env` and fill it
   in. (If the backend is already running, the Settings-tab save path applies changes live; a
   manual file edit is picked up on the next backend start.)
@@ -32,7 +32,9 @@ All configuration lives in **`backend/.env`**. You can edit it two ways:
 | `GOOGLE_CALENDAR_URL` | **Yes** | Google Calendar → Settings → your calendar → *Integrate calendar* → **"Secret address in iCal format"**. (The "public" address only works if the calendar is truly world-public with *full event details*; the secret address always works.) |
 | `ODOO_URL` | **Yes** | `https://erp.daredata.engineering` |
 | `ODOO_DB` | **Yes** | `odoo` |
-| `ODOO_SESSION_ID` | **Yes** | Your live Odoo session cookie. In a logged-in Odoo browser tab: DevTools → Application → Cookies → copy `session_id`. **It expires** (logout / server restart / re-login) — re-paste a fresh one in the Settings tab when the connection test fails. |
+| `ODOO_USERNAME` | With an API key | Your Odoo login email. |
+| `ODOO_API_KEY` | No (recommended) | An Odoo API key. With this and `ODOO_USERNAME` set, the session cookie is not used. Odoo only shows the API-key section in developer mode: open `<ODOO_URL>/web?debug=1` → avatar → **Preferences** → **Account Security** → **Developer API Keys** → **New API Key** (confirm your password; copy the key, it is shown once). Clear it to go back to `ODOO_SESSION_ID`. |
+| `ODOO_SESSION_ID` | Without an API key | Your live Odoo session cookie. In a logged-in Odoo browser tab: DevTools → Application → Cookies → copy `session_id`. **It expires** (logout / server restart / re-login) — re-paste a fresh one in the Settings tab when the connection test fails. |
 | `ODOO_VISITOR_UUID` | No | The `visitor_uuid` cookie (optional; leave blank if absent). |
 | `ODOO_USER_ID` | No | Auto-discovered from the session. Set only to override. |
 | `ODOO_NETWORK_MEMBER_ID` | No | Auto-discovered from the session. Set only to override. |
@@ -49,8 +51,21 @@ All configuration lives in **`backend/.env`**. You can edit it two ways:
 
 ## 2. How it connects to Odoo (technical)
 
-This Odoo instance has **no API keys**, so the app authenticates **the same way your browser does** —
-with your session cookie:
+The app authenticates one of two ways, picked from the config:
+
+**API key** (when both `ODOO_USERNAME` and `ODOO_API_KEY` are set). Odoo's external JSON-RPC API,
+with no cookie:
+
+- `POST /jsonrpc` `{"service":"common","method":"authenticate","args":[db, login, api_key, {}]}` →
+  your `uid` (or `false` for a bad key).
+- Every model call is `POST /jsonrpc`
+  `{"service":"object","method":"execute_kw","args":[db, uid, api_key, model, method, args, kwargs]}`.
+- A rejected key (`authenticate` returns `false`, or `Access Denied`) → *"Odoo rejected your API
+  key"* (HTTP 401 from the backend). The key does not expire on its own.
+- `network_member` discovery, the `ODOO_USER_ID` / `ODOO_NETWORK_MEMBER_ID` overrides, and the
+  unreachable → VPN popup work the same as with the session cookie below.
+
+**Session cookie** (otherwise). The same way your browser does:
 
 - Every request sends the `session_id` **cookie** plus an `X-Openerp-Session-Id` header and a
   `Referer: <ODOO_URL>/web` header, to Odoo's **web JSON-RPC** routes:
@@ -182,7 +197,8 @@ the app with no VPN/credentials. Set it back to `false` for live use.
 | Symptom | Cause / fix |
 |---|---|
 | "Can't reach Odoo" popup / Odoo "Down" | VPN is off → connect to the VPN and retry. |
-| Odoo connection test fails with a session message | `ODOO_SESSION_ID` expired → copy a fresh `session_id` from a logged-in Odoo tab into the Settings tab. |
+| Odoo connection test fails with a session message | `ODOO_SESSION_ID` expired → copy a fresh `session_id` from a logged-in Odoo tab into the Settings tab, or switch to an API key. |
+| Odoo connection test says it rejected your API key | The key was deleted or mistyped, or `ODOO_USERNAME` is not your Odoo login → create a new key (Settings → *How to get an Odoo API key*) and check the login. |
 | No events appear after Refresh | Check the date range; check `GOOGLE_CALENDAR_URL` (use the *secret* iCal address with full event details). |
 | An event you didn't want got imported | Add a **filter word** that matches its title. |
 | Events show "Unassigned" | No rule matched the title — add a mapping rule (keyword → contract) or pick a contract manually. |
