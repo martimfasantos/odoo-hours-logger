@@ -34,8 +34,8 @@
 - 🗓️ **List _and_ calendar views**, colour-coded by contract, with side-by-side overlaps.
 - 📊 **Logged overview** — per-contract **logged vs. to-be-logged** hours, month-to-date.
 - 🧹 **Filter words** to skip non-work events (e.g. _"Out of Office"_, _"Lunch"_).
-- ⚙️ **Editable, masked settings** saved to `.env` — re-paste your Odoo session here when it expires.
-- 🔌 **Odoo API key or session-cookie auth** with a clear **"check your VPN"** prompt when Odoo is unreachable.
+- ⚙️ **Editable, masked settings** saved to `.env`, with a step-by-step guide for creating your Odoo API key.
+- 🔌 **Odoo API-key sign-in** with a clear **"check your VPN"** prompt when Odoo is unreachable.
 - 🧪 **Demo mode** + a full test suite (**127** backend, **116** frontend).
 
 ## 📸 Screenshots
@@ -82,10 +82,9 @@ contracts and events with a simulated push (no Odoo or calendar needed). All the
 are demo mode.
 
 > **Configuration:** the key values are your Google Calendar **secret iCal URL** and your Odoo
-> credentials: either your Odoo **login + API key** (recommended; it does not expire, and the
-> Settings tab walks you through creating one) or your browser's **`session_id`** cookie (it
-> expires, and you re-paste it in the Settings tab). Full variable reference and the technical
-> details are in **[`docs/GUIDE.md`](docs/GUIDE.md)**.
+> sign-in: your Odoo **login + API key** (it does not expire, and the Settings tab walks you
+> through creating one). Full variable reference and the technical details are in
+> **[`docs/GUIDE.md`](docs/GUIDE.md)**.
 
 ## 🖥️ Desktop app (macOS)
 
@@ -105,7 +104,7 @@ cd odoo-hours-logger
 cd backend && python -m venv .venv && . .venv/bin/activate && pip install -e ".[dev,packaging]"
 cd ../frontend && npm install && cd ..
 
-# 3. Configure — your Google Calendar iCal URL + Odoo login and API key, or session_id (or fill these in later in Settings)
+# 3. Configure — your Google Calendar iCal URL + Odoo login and API key (or fill these in later in Settings)
 cp backend/.env.example backend/.env   # then edit backend/.env
 
 # 4. (optional) prettier app icon
@@ -159,7 +158,7 @@ Packaging changes nothing about development — keep using `./run.sh` (FastAPI o
 3. **Review** — adjust contracts/descriptions, remove stray events, approve what you want.
 4. **Push** — approved entries are created in Odoo (`timesheet_entry`); already-logged rows are greyed out so re-imports never double-log.
 
-Full technical walkthrough — Odoo session auth, how contracts are fetched, calendar parsing, rules,
+Full technical walkthrough — Odoo API-key auth, how contracts are fetched, calendar parsing, rules,
 dedup, the Logged overview — in **[`docs/GUIDE.md`](docs/GUIDE.md)**.
 
 ## 🛠️ Tech stack
