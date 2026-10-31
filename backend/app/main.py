@@ -1,7 +1,7 @@
 import logging
 from contextlib import asynccontextmanager
 from datetime import date as Date
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, time, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 from fastapi import Depends, FastAPI, HTTPException
@@ -64,6 +64,15 @@ def _is_ignored(title: str, keywords: list[str]) -> bool:
         if kw_clean and kw_clean in title_lower:
             return True
     return False
+
+
+def _local_day_bounds(start: Date, end: Date,
+                      local_tz: str) -> tuple[datetime, datetime]:
+    """Local midnight of `start` to local end-of-day of `end`, so Odoo returns
+    exactly the entries that bucket into those local dates."""
+    tz = ZoneInfo(local_tz)
+    return (datetime.combine(start, time.min, tzinfo=tz),
+            datetime.combine(end, time(23, 59, 59), tzinfo=tz))
 
 
 def _odoo_entry_keys(events: list[CalendarEvent], odoo: OdooClient,
@@ -281,9 +290,7 @@ def analytics(start: Date, end: Date,
         return demo.demo_analytics(start, end, settings.LOCAL_TZ)
     try:
         entries_raw = odoo.existing_entries(
-            datetime(start.year, start.month, start.day, tzinfo=timezone.utc),
-            datetime(end.year, end.month, end.day, 23, 59, 59, tzinfo=timezone.utc),
-        )
+            *_local_day_bounds(start, end, settings.LOCAL_TZ))
     except OdooUnreachable:
         raise HTTPException(status_code=503,
                             detail="Could not reach Odoo — check your VPN connection.")
@@ -379,11 +386,7 @@ def overview(start: Date, end: Date,
     else:
         try:
             entries = odoo.existing_entries(
-                datetime(start.year, start.month, start.day,
-                         tzinfo=timezone.utc),
-                datetime(end.year, end.month, end.day, 23, 59, 59,
-                         tzinfo=timezone.utc),
-            )
+                *_local_day_bounds(start, end, settings.LOCAL_TZ))
             for row in entries:
                 st_str = row.get("start_time")
                 et_str = row.get("end_time")
