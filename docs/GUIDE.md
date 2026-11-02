@@ -76,7 +76,7 @@ Hours are logged against **contracts**. The dropdowns and color legend are popul
 
 - `list_contracts()` → `call_kw("contract", "search_read", [[["network_member", "=", <your member id>]]], {fields:["display_name"], order:"display_name"})`.
 - The `network_member` filter is your auto-discovered member id (see §2), so you see only contracts
-  assigned to you (e.g. "[2390] … - Gen-OS AI Team", "[2346] … - Porto de Lisboa", …) — not the
+  assigned to you (e.g. "[1001] … - Client A", "[1002] … - Client B", …) — not the
   hundreds across the whole company.
 - Each contract is returned as `{id, name}` where `name` is the rich `display_name`. The numeric id
   is what gets written to the timesheet.

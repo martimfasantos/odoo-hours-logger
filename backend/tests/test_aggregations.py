@@ -29,16 +29,16 @@ def test_weekly_by_contract_sums_per_contract():
         return ProposedEntry(event=ev, match=match)
 
     entries = [
-        proposed("a", 1.0, 10, "GreenVolt"),
-        proposed("b", 0.5, 10, "GreenVolt"),
-        proposed("c", 2.0, 20, "Lisport"),
+        proposed("a", 1.0, 10, "Client A"),
+        proposed("b", 0.5, 10, "Client A"),
+        proposed("c", 2.0, 20, "Client B"),
     ]
     totals = weekly_by_contract(entries)
     gv = [t for t in totals if t.contract_id == 10][0]
     assert gv.hours == 1.5
-    assert gv.contract_name == "GreenVolt"
-    lisport = [t for t in totals if t.contract_id == 20][0]
-    assert lisport.hours == 2.0
+    assert gv.contract_name == "Client A"
+    client_b = [t for t in totals if t.contract_id == 20][0]
+    assert client_b.hours == 2.0
 
 
 def test_weekly_by_contract_skips_unmatched():

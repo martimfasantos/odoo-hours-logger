@@ -20,10 +20,10 @@ DEMO_CONTRACTS: list[OdooRef] = [
 # Template: (uid, title, day_offset, hour_start, hour_end)
 # demo-1 and demo-2 intentionally overlap (9:00–10:00 and 9:30–10:30)
 _TEMPLATES = [
-    ("demo-1", "GreenVolt standup",   0,  9,    10),
-    ("demo-2", "GreenVolt dev sync",  0,  9.5,  10.5),
+    ("demo-1", "Client A standup",    0,  9,    10),
+    ("demo-2", "Client A dev sync",   0,  9.5,  10.5),
     ("demo-3", "Team lunch",          0,  12,   13),
-    ("demo-4", "Lisport workshop",    1,  14,   15.5),
+    ("demo-4", "Client B workshop",   1,  14,   15.5),
     ("demo-5", "Internal admin",      2,  16,   16.5),
 ]
 

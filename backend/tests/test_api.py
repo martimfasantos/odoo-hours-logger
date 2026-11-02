@@ -27,7 +27,7 @@ def client(tmp_path, monkeypatch):
     ex = ExcludedStore(tmp_path / "excluded.json")
 
     fake_odoo = MagicMock(spec=OdooClient)
-    fake_odoo.list_contracts.return_value = [OdooRef(id=10, name="[10] GreenVolt")]
+    fake_odoo.list_contracts.return_value = [OdooRef(id=10, name="[10] Client A")]
     fake_odoo.existing_entries.return_value = []
     fake_odoo.create_timesheet.return_value = 500
     fake_odoo.test_connection.return_value = True
@@ -63,7 +63,7 @@ def test_contracts_endpoint(client):
     c, fake_odoo, _ = client
     resp = c.get("/api/odoo/contracts")
     assert resp.status_code == 200
-    assert resp.json()[0]["name"] == "[10] GreenVolt"
+    assert resp.json()[0]["name"] == "[10] Client A"
     fake_odoo.list_contracts.assert_called_once()
 
 
@@ -75,8 +75,8 @@ def test_contracts_endpoint_passes_query(client):
 
 def test_rules_crud_flow(client):
     c, _, _ = client
-    payload = {"name": "GreenVolt", "keywords": ["greenvolt"],
-               "contract_id": 10, "contract_name": "[10] GreenVolt"}
+    payload = {"name": "Client A", "keywords": ["client a"],
+               "contract_id": 10, "contract_name": "[10] Client A"}
     created = c.post("/api/rules", json=payload).json()
     assert created["id"] == 1
     assert len(c.get("/api/rules").json()) == 1
@@ -87,7 +87,7 @@ def test_rules_crud_flow(client):
 def test_analytics_endpoint(client):
     c, fake_odoo, _ = client
     fake_odoo.existing_entries.return_value = [
-        {"contract_id": 10, "contract_name": "[10] GreenVolt",
+        {"contract_id": 10, "contract_name": "[10] Client A",
          "start_time": "2026-06-01 09:00:00", "end_time": "2026-06-01 13:00:00",
          "work_description": "x", "duration_h": 4.0,
          "internal_cost": 160.0, "external_cost": 400.0},
@@ -108,12 +108,12 @@ def test_analytics_endpoint(client):
 # Lisbon summer time is UTC+1. Range 2026-07-01..2026-07-03:
 # FIRST_DAY_EARLY is 00:15 local on Jul 1 (must be fetched),
 # PAST_LAST_DAY is 00:10 local on Jul 4 (must not be fetched).
-FIRST_DAY_EARLY = {"contract_id": 10, "contract_name": "[10] GreenVolt",
+FIRST_DAY_EARLY = {"contract_id": 10, "contract_name": "[10] Client A",
                    "start_time": "2026-06-30 23:15:00",
                    "end_time": "2026-06-30 23:45:00",
                    "work_description": "early", "duration_h": 0.5,
                    "internal_cost": 0.0, "external_cost": 0.0}
-PAST_LAST_DAY = {"contract_id": 10, "contract_name": "[10] GreenVolt",
+PAST_LAST_DAY = {"contract_id": 10, "contract_name": "[10] Client A",
                  "start_time": "2026-07-03 23:10:00",
                  "end_time": "2026-07-03 23:55:00",
                  "work_description": "late", "duration_h": 0.75,
@@ -155,7 +155,7 @@ def test_push_creates_entry_and_records_ledger(client):
         "uid": "evt-1",
         "start": "2026-06-01T09:00:00",
         "end": "2026-06-01T09:30:00",
-        "description": "GreenVolt standup",
+        "description": "Client A standup",
         "contract_id": 10,
     }
     resp = c.post("/api/timesheet/push", json={"entries": [entry]})
@@ -308,7 +308,7 @@ def test_demo_push_simulates_and_dedups(demo_client):
         "uid": "demo-1",
         "start": "2026-06-08T09:00:00+01:00",
         "end": "2026-06-08T10:00:00+01:00",
-        "description": "GreenVolt standup",
+        "description": "Client A standup",
         "contract_id": 9001,
     }
     resp = c.post("/api/timesheet/push", json={"entries": [entry]})
@@ -387,13 +387,13 @@ def test_already_logged_from_odoo_existing_entry(client, monkeypatch):
 
     # A rule that matches the event title to contract 10.
     c.post("/api/rules", json={
-        "name": "GreenVolt", "keywords": ["greenvolt"],
-        "contract_id": 10, "contract_name": "[10] GreenVolt",
+        "name": "Client A", "keywords": ["client a"],
+        "contract_id": 10, "contract_name": "[10] Client A",
     })
 
     tz = timezone.utc
     ev = CalendarEvent(
-        uid="evt-x", title="GreenVolt standup",
+        uid="evt-x", title="Client A standup",
         start=datetime(2026, 6, 1, 9, 0, tzinfo=tz),
         end=datetime(2026, 6, 1, 9, 30, tzinfo=tz),
         hours=0.5, date=Date(2026, 6, 1),
@@ -401,10 +401,10 @@ def test_already_logged_from_odoo_existing_entry(client, monkeypatch):
     monkeypatch.setattr("app.main._load_events", lambda start, end, settings, user_email="": [ev])
     fake_odoo.existing_entries.return_value = [{
         "contract_id": 10,
-        "contract_name": "[10] GreenVolt",
+        "contract_name": "[10] Client A",
         "start_time": "2026-06-01 09:00:00",
         "end_time": "2026-06-01 09:30:00",
-        "work_description": "GreenVolt standup",
+        "work_description": "Client A standup",
         "duration_h": 0.5,
     }]
 
@@ -513,7 +513,7 @@ def test_overview_demo_returns_both_statuses(demo_client):
     c, _, _ = demo_client
     # Add a rule so demo calendar events match a contract and appear as to_log.
     c.post("/api/rules", json={
-        "name": "GreenVolt", "keywords": ["greenvolt"],
+        "name": "Client A", "keywords": ["client a"],
         "contract_id": 9001, "contract_name": "[9001] Demo Client A",
     })
     resp = c.get("/api/overview?start=2026-06-08&end=2026-06-12")
@@ -567,8 +567,8 @@ def test_overview_non_demo_uses_odoo_entries(client, monkeypatch):
 
     # Add a rule so calendar events can be marked to_log.
     c.post("/api/rules", json={
-        "name": "GreenVolt", "keywords": ["meeting"],
-        "contract_id": 10, "contract_name": "[10] GreenVolt",
+        "name": "Client A", "keywords": ["meeting"],
+        "contract_id": 10, "contract_name": "[10] Client A",
     })
 
     tz = timezone.utc
@@ -584,7 +584,7 @@ def test_overview_non_demo_uses_odoo_entries(client, monkeypatch):
     fake_odoo.existing_entries.return_value = [
         {
             "contract_id": 10,
-            "contract_name": "[10] GreenVolt",
+            "contract_name": "[10] Client A",
             "start_time": "2026-06-08 08:00:00",
             "end_time": "2026-06-08 09:30:00",
             "work_description": "Previous logged work",
@@ -615,8 +615,8 @@ def test_overview_odoo_failure_still_returns_to_log(client, monkeypatch):
     c, fake_odoo, _ = client
 
     c.post("/api/rules", json={
-        "name": "GreenVolt", "keywords": ["meeting"],
-        "contract_id": 10, "contract_name": "[10] GreenVolt",
+        "name": "Client A", "keywords": ["meeting"],
+        "contract_id": 10, "contract_name": "[10] Client A",
     })
 
     tz = timezone.utc

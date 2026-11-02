@@ -248,22 +248,22 @@ from app.schemas import CalendarEvent, Rule, RuleCreate, PushEntry
 def test_calendar_event_roundtrip():
     ev = CalendarEvent(
         uid="abc",
-        title="GreenVolt standup",
+        title="Client A standup",
         start=datetime(2026, 6, 1, 9, 0),
         end=datetime(2026, 6, 1, 9, 30),
         hours=0.5,
         date=date(2026, 6, 1),
     )
     assert ev.hours == 0.5
-    assert ev.title == "GreenVolt standup"
+    assert ev.title == "Client A standup"
 
 
 def test_rule_create_defaults_active_true():
     rc = RuleCreate(
-        name="GreenVolt",
-        keywords=["greenvolt"],
+        name="Client A",
+        keywords=["client a"],
         project_id=10,
-        project_name="GreenVolt",
+        project_name="Client A",
         task_id=55,
         task_name="Meetings",
         priority=1,
@@ -277,7 +277,7 @@ def test_push_entry_requires_targets():
         start=datetime(2026, 6, 1, 9, 0),
         date=date(2026, 6, 1),
         hours=0.5,
-        description="GreenVolt standup",
+        description="Client A standup",
         project_id=10,
         task_id=55,
     )
@@ -401,7 +401,7 @@ PRODID:-//Test//Test//EN
 VERSION:2.0
 BEGIN:VEVENT
 UID:evt-timed-1
-SUMMARY:GreenVolt standup
+SUMMARY:Client A standup
 DTSTART:20260601T080000Z
 DTEND:20260601T083000Z
 END:VEVENT
@@ -617,36 +617,36 @@ def _rule(id, name, keywords, project_id, priority=100, active=True, task_id=Non
 
 
 def test_single_keyword_match():
-    rules = [_rule(1, "GreenVolt", ["greenvolt"], 10)]
-    m = match_title("GreenVolt standup", rules)
+    rules = [_rule(1, "Client A", ["client a"], 10)]
+    m = match_title("Client A standup", rules)
     assert m.rule_id == 1
     assert m.project_id == 10
 
 
 def test_match_is_case_insensitive():
-    rules = [_rule(1, "GreenVolt", ["GREENVOLT"], 10)]
-    m = match_title("greenvolt sync", rules)
+    rules = [_rule(1, "Client A", ["CLIENT A"], 10)]
+    m = match_title("client a sync", rules)
     assert m.rule_id == 1
 
 
 def test_priority_decides_winner_and_records_alternatives():
     rules = [
         _rule(1, "Generic", ["sync"], 99, priority=200),
-        _rule(2, "GreenVolt", ["greenvolt"], 10, priority=1),
+        _rule(2, "Client A", ["client a"], 10, priority=1),
     ]
-    m = match_title("GreenVolt sync", rules)
+    m = match_title("Client A sync", rules)
     assert m.rule_id == 2
     assert m.alternative_rule_ids == [1]
 
 
 def test_inactive_rule_ignored():
-    rules = [_rule(1, "GreenVolt", ["greenvolt"], 10, active=False)]
-    m = match_title("GreenVolt standup", rules)
+    rules = [_rule(1, "Client A", ["client a"], 10, active=False)]
+    m = match_title("Client A standup", rules)
     assert m.rule_id is None
 
 
 def test_no_match_returns_empty_result():
-    rules = [_rule(1, "GreenVolt", ["greenvolt"], 10)]
+    rules = [_rule(1, "Client A", ["client a"], 10)]
     m = match_title("Lunch", rules)
     assert m.rule_id is None
     assert m.project_id is None
@@ -720,10 +720,10 @@ def _store(tmp_path):
     return RulesStore(tmp_path / "rules.json")
 
 
-def _payload(name="GreenVolt"):
+def _payload(name="Client A"):
     return RuleCreate(
-        name=name, keywords=["greenvolt"], project_id=10,
-        project_name="GreenVolt", task_id=55, task_name="Meetings", priority=1,
+        name=name, keywords=["client a"], project_id=10,
+        project_name="Client A", task_id=55, task_name="Meetings", priority=1,
     )
 
 
@@ -750,8 +750,8 @@ def test_update_changes_fields(tmp_path):
     s = _store(tmp_path)
     r = s.create(_payload())
     updated = s.update(r.id, RuleCreate(
-        name="GreenVolt", keywords=["gv", "greenvolt"], project_id=10,
-        project_name="GreenVolt", task_id=55, task_name="Meetings", priority=5,
+        name="Client A", keywords=["gv", "client a"], project_id=10,
+        project_name="Client A", task_id=55, task_name="Meetings", priority=5,
     ))
     assert updated.priority == 5
     assert "gv" in updated.keywords
@@ -987,16 +987,16 @@ def test_weekly_by_contract_sums_per_project_task():
         return ProposedEntry(event=ev, match=match)
 
     entries = [
-        proposed("a", 1.0, 10, "GreenVolt", 55, "Meetings"),
-        proposed("b", 0.5, 10, "GreenVolt", 55, "Meetings"),
-        proposed("c", 2.0, 20, "Lisport", None, None),
+        proposed("a", 1.0, 10, "Client A", 55, "Meetings"),
+        proposed("b", 0.5, 10, "Client A", 55, "Meetings"),
+        proposed("c", 2.0, 20, "Client B", None, None),
     ]
     totals = weekly_by_contract(entries)
     gv = [t for t in totals if t.project_id == 10][0]
     assert gv.hours == 1.5
     assert gv.task_name == "Meetings"
-    lisport = [t for t in totals if t.project_id == 20][0]
-    assert lisport.hours == 2.0
+    client_b = [t for t in totals if t.project_id == 20][0]
+    assert client_b.hours == 2.0
 ```
 
 - [ ] **Step 2: Run test to verify it fails**
@@ -1090,10 +1090,10 @@ def test_authenticate_caches_uid():
 
 def test_list_projects_returns_refs():
     c = _client()
-    c.models.execute_kw.return_value = [{"id": 10, "name": "GreenVolt"}]
+    c.models.execute_kw.return_value = [{"id": 10, "name": "Client A"}]
     projects = c.list_projects()
     assert projects[0].id == 10
-    assert projects[0].name == "GreenVolt"
+    assert projects[0].name == "Client A"
     args = c.models.execute_kw.call_args[0]
     assert args[3] == "project.project"
     assert args[4] == "search_read"
@@ -1114,7 +1114,7 @@ def test_create_timesheet_returns_line_id():
         [{"id": 99}],  # employee lookup
         500,            # create
     ]
-    line_id = c.create_timesheet(date="2026-06-01", name="GreenVolt standup",
+    line_id = c.create_timesheet(date="2026-06-01", name="Client A standup",
                                  hours=0.5, project_id=10, task_id=55)
     assert line_id == 500
     create_call = c.models.execute_kw.call_args_list[-1][0]
@@ -1297,7 +1297,7 @@ def client(tmp_path, monkeypatch):
     lg = Ledger(tmp_path / "ledger.json")
 
     fake_odoo = MagicMock(spec=OdooClient)
-    fake_odoo.list_projects.return_value = [OdooRef(id=10, name="GreenVolt")]
+    fake_odoo.list_projects.return_value = [OdooRef(id=10, name="Client A")]
     fake_odoo.list_tasks.return_value = [OdooRef(id=55, name="Meetings")]
     fake_odoo.create_timesheet.return_value = 500
     fake_odoo.test_connection.return_value = True
@@ -1319,13 +1319,13 @@ def test_projects_endpoint(client):
     c, _, _ = client
     resp = c.get("/api/odoo/projects")
     assert resp.status_code == 200
-    assert resp.json()[0]["name"] == "GreenVolt"
+    assert resp.json()[0]["name"] == "Client A"
 
 
 def test_rules_crud_flow(client):
     c, _, _ = client
-    payload = {"name": "GreenVolt", "keywords": ["greenvolt"],
-               "project_id": 10, "project_name": "GreenVolt",
+    payload = {"name": "Client A", "keywords": ["client a"],
+               "project_id": 10, "project_name": "Client A",
                "task_id": 55, "task_name": "Meetings", "priority": 1}
     created = c.post("/api/rules", json=payload).json()
     assert created["id"] == 1
@@ -1341,7 +1341,7 @@ def test_push_creates_line_and_records_ledger(client):
         "start": "2026-06-01T09:00:00",
         "date": "2026-06-01",
         "hours": 0.5,
-        "description": "GreenVolt standup",
+        "description": "Client A standup",
         "project_id": 10,
         "task_id": 55,
     }

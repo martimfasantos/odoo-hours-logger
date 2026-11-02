@@ -146,7 +146,7 @@ describe("MappingRules page", () => {
     const CONTRACTS = [
       { id: 10, name: "Acme Corp", start_date: "2020-01-01", end_date: "2999-12-31" },
       { id: 20, name: "Beta Ltd", start_date: null, end_date: null },
-      { id: 30, name: "Old Greenvolt", start_date: "2019-02-01", end_date: "2020-01-31" },
+      { id: 30, name: "Old Client A", start_date: "2019-02-01", end_date: "2020-01-31" },
     ];
     const rule = (id: number, name: string, contract_id: number) => ({
       id,
@@ -158,7 +158,7 @@ describe("MappingRules page", () => {
     });
     const STALE_RULES = [
       rule(2, "DREM", 2056),
-      rule(3, "Greenvolt", 30),
+      rule(3, "Client A", 30),
       rule(4, "Acme", 10),
     ];
 
@@ -179,7 +179,7 @@ describe("MappingRules page", () => {
         expect(within(drem).getByText("Not in your contracts")).toBeInTheDocument();
       });
       expect(
-        within(screen.getByRole("row", { name: /Greenvolt/ })).getByText("Ended Jan 31"),
+        within(screen.getByRole("row", { name: /Client A/ })).getByText("Ended Jan 31"),
       ).toBeInTheDocument();
       expect(fixSelect("Acme")).toBeNull();
 
