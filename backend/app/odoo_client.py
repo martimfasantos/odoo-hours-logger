@@ -7,8 +7,8 @@ import httpx
 from app.schemas import OdooRef
 
 
-class OdooSessionExpired(RuntimeError):
-    """Raised when the Odoo session cookie is missing or expired."""
+class OdooAuthError(RuntimeError):
+    """Raised when Odoo sign-in fails: no login/API key set, or the key was rejected."""
 
 
 class OdooUnreachable(RuntimeError):
@@ -29,105 +29,76 @@ def parse_odoo_utc(odoo_str: str, local_tz: str) -> datetime:
     return dt_utc.astimezone(ZoneInfo(local_tz))
 
 
-_EXPIRED_HINTS = ("session", "expired", "login")
-_SESSION_EXPIRED_MSG = (
-    "Odoo session expired — copy a fresh session_id from a logged-in Odoo "
-    "browser tab and paste it into Settings → Odoo Session ID."
+_MISSING_CREDENTIALS_MSG = "Add your Odoo login and API key in Settings."
+_API_KEY_REJECTED_MSG = (
+    "Odoo rejected your API key — create a new one in Odoo and paste it "
+    "into Settings → Odoo API key."
 )
 
 
 class OdooClient:
-    def __init__(self, base_url: str, session_id: str, local_tz: str, db: str,
-                 visitor_uuid: str = "", user_id: Optional[int] = None,
-                 network_member_id: Optional[int] = None, http_client=None):
+    """Odoo client over the external `/jsonrpc` API, signed in with a login and API key."""
+
+    def __init__(self, base_url: str, local_tz: str, db: str, login: str,
+                 api_key: str, network_member_id: Optional[int] = None,
+                 http_client=None):
         self.base_url = base_url.rstrip("/")
-        self.session_id = session_id
         self.local_tz = local_tz
         self.db = db
-        self.visitor_uuid = visitor_uuid
-        self._user_id_override = user_id
+        self.login = login
+        self.api_key = api_key
         self._network_member_id_override = network_member_id
         self._uid: Optional[int] = None
         self._network_member_id: Optional[int] = None
-        self._user_email: Optional[str] = None
-
-        cookies = {"session_id": session_id}
-        if visitor_uuid:
-            cookies["visitor_uuid"] = visitor_uuid
-        headers = {
-            "X-Openerp-Session-Id": session_id,
-            "Referer": f"{self.base_url}/web",
-            "Content-Type": "application/json",
-        }
         if http_client is None:
             # Short connect timeout so an unreachable Odoo (e.g. VPN off) fails
             # fast and surfaces the "check your VPN" prompt quickly; allow a
             # longer read timeout for normal (slower) responses.
-            http_client = httpx.Client(headers=headers, cookies=cookies,
-                                       timeout=httpx.Timeout(20.0, connect=6.0))
-        else:
-            # Allow injecting a pre-built client (e.g. tests) but still apply
-            # headers/cookies when the client supports it.
-            for attr, value in (("headers", headers), ("cookies", cookies)):
-                target = getattr(http_client, attr, None)
-                if target is not None:
-                    try:
-                        target.update(value)
-                    except (AttributeError, TypeError):
-                        pass
+            http_client = httpx.Client(timeout=httpx.Timeout(20.0, connect=6.0))
         self._http = http_client
 
     # -- low-level transport ------------------------------------------------
 
-    def _call(self, path: str, params: dict) -> dict:
-        envelope = {"jsonrpc": "2.0", "method": "call", "params": params}
+    def _call(self, service: str, method: str, args: list):
+        envelope = {"jsonrpc": "2.0", "method": "call",
+                    "params": {"service": service, "method": method,
+                               "args": args}}
         try:
-            resp = self._http.post(f"{self.base_url}{path}", json=envelope)
+            resp = self._http.post(f"{self.base_url}/jsonrpc", json=envelope)
         except httpx.RequestError as exc:
             raise OdooUnreachable(
                 "Could not reach Odoo — check your VPN connection."
             ) from exc
         content_type = resp.headers.get("content-type", "")
         if "json" not in content_type.lower():
-            # HTML login page → session is gone.
-            raise OdooSessionExpired(_SESSION_EXPIRED_MSG)
+            raise RuntimeError(
+                "Odoo did not return JSON — check the Odoo URL in Settings.")
         data = resp.json()
         if data.get("error"):
             message = _error_message(data["error"])
-            if any(hint in message.lower() for hint in _EXPIRED_HINTS):
-                raise OdooSessionExpired(_SESSION_EXPIRED_MSG)
+            if (data["error"].get("data") or {}).get("name") == "odoo.exceptions.AccessDenied":
+                raise OdooAuthError(_API_KEY_REJECTED_MSG)
             raise RuntimeError(message)
         return data.get("result")
 
     def call_kw(self, model: str, method: str, args: list,
                 kwargs: Optional[dict] = None):
-        return self._call(
-            f"/web/dataset/call_kw/{model}/{method}",
-            {"model": model, "method": method, "args": args,
-             "kwargs": kwargs or {}},
-        )
+        return self._call("object", "execute_kw",
+                          [self.db, self.uid(), self.api_key, model, method,
+                           args, kwargs or {}])
 
     # -- identity -----------------------------------------------------------
 
-    def session_info(self) -> dict:
-        return self._call("/web/session/get_session_info", {})
-
     def uid(self) -> int:
-        if self._user_id_override:
-            return self._user_id_override
         if self._uid is None:
-            info = self.session_info() or {}
-            uid = info.get("uid")
+            if not (self.login and self.api_key):
+                raise OdooAuthError(_MISSING_CREDENTIALS_MSG)
+            uid = self._call("common", "authenticate",
+                             [self.db, self.login, self.api_key, {}])
             if not uid:
-                raise OdooSessionExpired(_SESSION_EXPIRED_MSG)
+                raise OdooAuthError(_API_KEY_REJECTED_MSG)
             self._uid = uid
         return self._uid
-
-    def user_email(self) -> str:
-        if self._user_email is None:
-            info = self.session_info() or {}
-            self._user_email = info.get("username") or ""
-        return self._user_email
 
     def network_member_id(self) -> int:
         if self._network_member_id_override:
@@ -153,10 +124,13 @@ class OdooClient:
         rows = self.call_kw(
             "contract", "search_read",
             [domain],
-            {"fields": ["display_name"], "order": "display_name",
-             "limit": limit},
+            {"fields": ["display_name", "start_date", "end_date"],
+             "order": "display_name", "limit": limit},
         )
-        return [OdooRef(id=row["id"], name=row.get("display_name") or "")
+        # Odoo sends `false` for an empty date field.
+        return [OdooRef(id=row["id"], name=row.get("display_name") or "",
+                        start_date=row.get("start_date") or None,
+                        end_date=row.get("end_date") or None)
                 for row in rows]
 
     def existing_entries(self, start: datetime, end: datetime) -> list[dict]:

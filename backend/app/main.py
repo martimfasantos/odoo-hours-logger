@@ -18,7 +18,7 @@ from app.excluded import ExcludedStore
 from app.ignore import IgnoreStore
 from app.ledger import Ledger
 from app.matcher import match_title
-from app.odoo_client import OdooClient, OdooSessionExpired, OdooUnreachable, parse_odoo_utc, to_odoo_utc
+from app.odoo_client import OdooClient, OdooAuthError, OdooUnreachable, parse_odoo_utc, to_odoo_utc
 from app.colors import ColorStore
 from app.rules import RulesStore
 from app.schemas import (
@@ -70,7 +70,7 @@ def _odoo_entry_keys(events: list[CalendarEvent], odoo: OdooClient,
                      demo_mode: bool) -> set[tuple[int, str, str]]:
     """Best-effort set of (contract_id, start_utc, end_utc) keys for entries
     already in Odoo. Falls back to an empty set on any failure so the request
-    never fails just because Odoo is unreachable or the session expired."""
+    never fails just because Odoo is unreachable or sign-in failed."""
     if demo_mode or not events:
         return set()
     range_start = min(ev.start for ev in events)
@@ -119,21 +119,14 @@ def _build_proposals(events: list[CalendarEvent], rules: list[Rule],
     return proposals
 
 
-def _resolve_user_email(settings: Settings, odoo: OdooClient) -> str:
+def _resolve_user_email(settings: Settings) -> str:
     """Return the effective user email for declined-event detection.
 
     Priority:
     1. ``settings.USER_EMAIL`` if set (explicit override).
-    2. Email auto-derived from the Odoo session (``get_session_info`` → username).
-    3. Empty string if the session call fails (best-effort; declined events will
-       not be filtered, but the request won't fail).
+    2. The Odoo login (``ODOO_USERNAME``).
     """
-    if settings.USER_EMAIL:
-        return settings.USER_EMAIL
-    try:
-        return odoo.user_email()
-    except Exception:
-        return ""
+    return settings.USER_EMAIL or settings.ODOO_USERNAME
 
 
 def _load_events(start: Date, end: Date, settings: Settings,
@@ -155,9 +148,8 @@ def _settings_to_config(s: Settings) -> ConfigValues:
         GOOGLE_CALENDAR_URL=s.GOOGLE_CALENDAR_URL,
         ODOO_URL=s.ODOO_URL,
         ODOO_DB=s.ODOO_DB,
-        ODOO_SESSION_ID=s.ODOO_SESSION_ID,
-        ODOO_VISITOR_UUID=s.ODOO_VISITOR_UUID,
-        ODOO_USER_ID=s.ODOO_USER_ID,
+        ODOO_USERNAME=s.ODOO_USERNAME,
+        ODOO_API_KEY=s.ODOO_API_KEY,
         ODOO_NETWORK_MEMBER_ID=s.ODOO_NETWORK_MEMBER_ID,
         LOCAL_TZ=s.LOCAL_TZ,
         USER_EMAIL=s.USER_EMAIL,
@@ -216,7 +208,7 @@ def contracts(query: str = "",
     except OdooUnreachable as exc:
         raise HTTPException(status_code=503,
                             detail="Could not reach Odoo — check your VPN connection.")
-    except OdooSessionExpired as exc:
+    except OdooAuthError as exc:
         raise HTTPException(status_code=401, detail=str(exc))
 
 
@@ -228,7 +220,7 @@ def calendar_events(start: Date, end: Date,
                     odoo: OdooClient = Depends(deps.odoo),
                     ignore_store: IgnoreStore = Depends(deps.ignore_store),
                     excluded_store: ExcludedStore = Depends(deps.excluded_store)):
-    user_email = settings.USER_EMAIL if settings.DEMO_MODE else _resolve_user_email(settings, odoo)
+    user_email = settings.USER_EMAIL if settings.DEMO_MODE else _resolve_user_email(settings)
     events = _load_events(start, end, settings, user_email)
     kws = ignore_store.get()
     events = [ev for ev in events if not _is_ignored(ev.title, kws)]
@@ -244,7 +236,7 @@ def daily(start: Date, end: Date,
           odoo: OdooClient = Depends(deps.odoo),
           ignore_store: IgnoreStore = Depends(deps.ignore_store),
           excluded_store: ExcludedStore = Depends(deps.excluded_store)):
-    user_email = settings.USER_EMAIL if settings.DEMO_MODE else _resolve_user_email(settings, odoo)
+    user_email = settings.USER_EMAIL if settings.DEMO_MODE else _resolve_user_email(settings)
     events = _load_events(start, end, settings, user_email)
     kws = ignore_store.get()
     events = [ev for ev in events if not _is_ignored(ev.title, kws)]
@@ -264,7 +256,7 @@ def weekly(start: Date, end: Date,
            odoo: OdooClient = Depends(deps.odoo),
            ignore_store: IgnoreStore = Depends(deps.ignore_store),
            excluded_store: ExcludedStore = Depends(deps.excluded_store)):
-    user_email = settings.USER_EMAIL if settings.DEMO_MODE else _resolve_user_email(settings, odoo)
+    user_email = settings.USER_EMAIL if settings.DEMO_MODE else _resolve_user_email(settings)
     events = _load_events(start, end, settings, user_email)
     kws = ignore_store.get()
     events = [ev for ev in events if not _is_ignored(ev.title, kws)]
@@ -287,7 +279,7 @@ def analytics(start: Date, end: Date,
     except OdooUnreachable:
         raise HTTPException(status_code=503,
                             detail="Could not reach Odoo — check your VPN connection.")
-    except OdooSessionExpired as exc:
+    except OdooAuthError as exc:
         raise HTTPException(status_code=401, detail=str(exc))
 
     entries: list[dict] = []
@@ -304,7 +296,7 @@ def analytics(start: Date, end: Date,
     contract_ids = {e["contract_id"] for e in entries if e.get("contract_id") is not None}
     try:
         rates = odoo.contract_rates(list(contract_ids))
-    except (OdooUnreachable, OdooSessionExpired):
+    except (OdooUnreachable, OdooAuthError):
         rates = {}
     return build_analytics(entries, rates)
 
@@ -320,7 +312,7 @@ def overview(start: Date, end: Date,
     logger = logging.getLogger(__name__)
 
     user_email = (settings.USER_EMAIL if settings.DEMO_MODE
-                  else _resolve_user_email(settings, odoo))
+                  else _resolve_user_email(settings))
     events = _load_events(start, end, settings, user_email)
     kws = ignore_store.get()
     events = [ev for ev in events if not _is_ignored(ev.title, kws)]
@@ -536,7 +528,7 @@ def push(req: PushRequest,
                           pushed_at=datetime.now(timezone.utc).isoformat())
             results.append(PushResult(uid=entry.uid, start=entry.start,
                                       success=True, odoo_id=odoo_id))
-        except OdooSessionExpired as exc:
+        except OdooAuthError as exc:
             results.append(PushResult(uid=entry.uid, start=entry.start,
                                       success=False, error=str(exc)))
         except Exception as exc:  # surface per-row failure
@@ -557,7 +549,7 @@ def test_connection(settings: Settings = Depends(deps.settings),
         result["odoo"] = False
         result["odoo_unreachable"] = True
         result["errors"]["odoo"] = str(exc)
-    except OdooSessionExpired as exc:
+    except OdooAuthError as exc:
         result["odoo"] = False
         result["odoo_unreachable"] = False
         result["errors"]["odoo"] = str(exc)
