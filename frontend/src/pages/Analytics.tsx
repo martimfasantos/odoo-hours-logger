@@ -6,6 +6,7 @@ import { useToast } from "../components/Toast";
 import Button from "../components/Button";
 import Spinner from "../components/Spinner";
 import VpnModal from "../components/VpnModal";
+import DateRangePicker from "../components/DateRangePicker";
 import { colorForContract } from "../lib/colors";
 import { isUnreachableError } from "../lib/errors";
 
@@ -42,10 +43,6 @@ export default function Analytics() {
   }, []);
 
   async function load() {
-    if (from > to) {
-      toast.error('"From" must be on or before "To".');
-      return;
-    }
     setLoading(true);
     try {
       setData(await api.analytics(from, to));
@@ -98,30 +95,14 @@ export default function Analytics() {
       <div className="card">
         <div className="card__pad">
           <div className="toolbar">
-            <div className="field">
-              <label className="field__label" htmlFor="an-from">
-                From
-              </label>
-              <input
-                id="an-from"
-                type="date"
-                className="input"
-                value={from}
-                onChange={(e) => setFrom(e.target.value)}
-              />
-            </div>
-            <div className="field">
-              <label className="field__label" htmlFor="an-to">
-                To
-              </label>
-              <input
-                id="an-to"
-                type="date"
-                className="input"
-                value={to}
-                onChange={(e) => setTo(e.target.value)}
-              />
-            </div>
+            <DateRangePicker
+              from={from}
+              to={to}
+              onChange={(start, end) => {
+                setFrom(start);
+                setTo(end);
+              }}
+            />
             <Button variant="primary" onClick={load} loading={loading} disabled={loading}>
               {!loading && <RefreshCw size={16} aria-hidden="true" />}
               Refresh

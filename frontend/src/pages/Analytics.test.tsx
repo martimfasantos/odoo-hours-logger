@@ -1,5 +1,6 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { ToastProvider } from "../components/Toast";
 import Analytics from "./Analytics";
 
@@ -44,6 +45,10 @@ beforeEach(() => {
   vi.mocked(api.analytics).mockResolvedValue(RESP);
 });
 
+afterEach(() => {
+  vi.useRealTimers();
+});
+
 describe("Analytics page", () => {
   it("renders the Analytics heading", () => {
     renderAnalytics();
@@ -65,6 +70,24 @@ describe("Analytics page", () => {
     renderAnalytics();
     await waitFor(() => expect(screen.getByText("Acme")).toBeInTheDocument());
     expect(document.querySelectorAll(".bar-row").length).toBe(2);
+  });
+
+  it("reloads with the range picked in the date picker only on Refresh", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(2026, 9, 30, 12));
+    renderAnalytics();
+    await waitFor(() =>
+      expect(api.analytics).toHaveBeenCalledWith("2026-10-01", "2026-10-30")
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: /From – To/ }));
+    await userEvent.click(screen.getByRole("button", { name: "Last month" }));
+    expect(api.analytics).toHaveBeenCalledTimes(1);
+
+    await userEvent.click(screen.getByRole("button", { name: "Refresh" }));
+    await waitFor(() =>
+      expect(api.analytics).toHaveBeenLastCalledWith("2026-09-01", "2026-09-30")
+    );
   });
 
   it("shows the empty state when there are no projects", async () => {
