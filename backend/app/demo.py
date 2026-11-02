@@ -29,29 +29,41 @@ _TEMPLATES = [
 
 
 def demo_analytics(start: Date, end: Date, local_tz: str):
-    """Deterministic sample analytics so the tab works offline (demo mode)."""
+    """Deterministic sample analytics so the tab works offline (demo mode).
+
+    Every weekday in the range gets Client A hours, most get Client B, and
+    Fridays add non-billable Internal time, so the chart's day/week/month and
+    billable/margin views all have something to show.
+    """
     from app.aggregations import build_analytics
 
-    def entry(cid, name, day_off, hours, internal, external):
-        return {
-            "contract_id": cid, "contract_name": name,
-            "duration_h": hours, "internal_cost": internal,
-            "external_cost": external,
-            "local_date": min(start + timedelta(days=day_off), end),
-        }
-
-    entries = [
-        entry(9001, "[9001] Demo Client A", 0, 4.0, 160.0, 400.0),
-        entry(9001, "[9001] Demo Client A", 7, 3.0, 120.0, 300.0),
-        entry(9002, "[9002] Demo Client B", 1, 5.0, 250.0, 500.0),
-        entry(9003, "[9003] Internal", 2, 2.0, 90.0, 0.0),
-    ]
     rates = {
         9001: {"internal_rate": 40.0, "external_rate": 100.0, "margin": 0.6},
-        9002: {"internal_rate": 50.0, "external_rate": 100.0, "margin": 0.5},
+        9002: {"internal_rate": 50.0, "external_rate": 90.0, "margin": 0.44},
         9003: {"internal_rate": 45.0, "external_rate": 0.0, "margin": 0.0},
     }
-    return build_analytics(entries, rates, start, end)
+    names = {c.id: c.name for c in DEMO_CONTRACTS}
+
+    def entry(cid, d, hours):
+        r = rates[cid]
+        return {
+            "contract_id": cid, "contract_name": names[cid],
+            "duration_h": hours, "internal_cost": hours * r["internal_rate"],
+            "external_cost": hours * r["external_rate"], "local_date": d,
+        }
+
+    entries = []
+    d = start
+    while d <= end:
+        n = d.toordinal()
+        if d.weekday() < 5:
+            entries.append(entry(9001, d, 2.0 + n % 4))
+            if n % 3:
+                entries.append(entry(9002, d, 1.5 + n % 2))
+            if d.weekday() == 4:
+                entries.append(entry(9003, d, 1.5))
+        d += timedelta(days=1)
+    return build_analytics(entries, rates)
 
 
 def demo_events(start: Date, end: Date, local_tz: str) -> list[CalendarEvent]:

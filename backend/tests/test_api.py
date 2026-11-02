@@ -100,9 +100,9 @@ def test_analytics_endpoint(client):
     assert body["projects"][0]["contract_id"] == 10
     assert body["projects"][0]["revenue"] == 400.0
     assert body["projects"][0]["external_rate"] == 100.0
-    assert body["totals"]["hours"] == 4.0
     assert body["currency"] == "EUR"
-    assert len(body["weekly"]) >= 1
+    assert body["entries"] == [{"date": "2026-06-01", "contract_id": 10,
+                                "hours": 4.0, "revenue": 400.0, "cost": 160.0}]
 
 
 def test_push_creates_entry_and_records_ledger(client):
@@ -235,6 +235,17 @@ def test_demo_contracts(demo_client):
     assert by_id[9001]["end_date"] > today
     assert by_id[9002]["end_date"] < today
     assert by_id[9003]["end_date"] is None
+
+
+def test_demo_analytics_spans_months_and_billable_mix(demo_client):
+    c, _, _ = demo_client
+    body = c.get("/api/analytics?start=2026-09-01&end=2026-10-31").json()
+    months = {e["date"][:7] for e in body["entries"]}
+    assert months == {"2026-09", "2026-10"}
+    assert {e["contract_id"] for e in body["entries"]} == {9001, 9002, 9003}
+    rates = {p["contract_id"]: p["external_rate"] for p in body["projects"]}
+    assert rates[9003] == 0.0
+    assert rates[9001] > 0
 
 
 def test_demo_events_returns_sample(demo_client):
