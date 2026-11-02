@@ -513,7 +513,7 @@ def test_overview_demo_returns_both_statuses(demo_client):
     c, _, _ = demo_client
     # Add a rule so demo calendar events match a contract and appear as to_log.
     c.post("/api/rules", json={
-        "name": "GreenVolt", "keywords": ["greenvolt"],
+        "name": "Client A", "keywords": ["client a"],
         "contract_id": 9001, "contract_name": "[9001] Demo Client A",
     })
     resp = c.get("/api/overview?start=2026-06-08&end=2026-06-12")
