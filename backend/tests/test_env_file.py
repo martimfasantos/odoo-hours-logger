@@ -26,14 +26,14 @@ def test_read_env_parses_key_value_pairs(tmp_path, monkeypatch):
 
 def test_write_env_updates_existing_key(tmp_path, monkeypatch):
     path = tmp_path / ".env"
-    path.write_text("ODOO_SESSION_ID=old\nODOO_DB=mydb\n")
+    path.write_text("ODOO_API_KEY=old\nODOO_DB=mydb\n")
     monkeypatch.setattr(ef, "ENV_PATH", path)
 
-    ef.write_env({"ODOO_SESSION_ID": "newtoken"})
+    ef.write_env({"ODOO_API_KEY": "newkey"})
 
     content = path.read_text()
-    assert "ODOO_SESSION_ID=newtoken" in content
-    assert "ODOO_SESSION_ID=old" not in content
+    assert "ODOO_API_KEY=newkey" in content
+    assert "ODOO_API_KEY=old" not in content
     # Unrelated key preserved
     assert "ODOO_DB=mydb" in content
 

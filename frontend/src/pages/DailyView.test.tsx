@@ -135,6 +135,18 @@ describe("DailyView page", () => {
     });
   });
 
+  it("shows the Odoo sign-in modal when Odoo rejects the API key", async () => {
+    vi.mocked(api.contracts).mockRejectedValue(
+      new Error(
+        '401: {"detail":"Odoo rejected your API key — create a new one in Odoo and paste it into Settings → Odoo API key."}'
+      )
+    );
+    renderDailyView();
+    expect(
+      await screen.findByRole("heading", { name: "Odoo sign-in failed" })
+    ).toBeInTheDocument();
+  });
+
   it("shows the Refresh from calendar button", async () => {
     renderDailyView();
     expect(

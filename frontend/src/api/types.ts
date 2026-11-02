@@ -136,9 +136,8 @@ export interface ConfigValues {
   GOOGLE_CALENDAR_URL: string;
   ODOO_URL: string;
   ODOO_DB: string;
-  ODOO_SESSION_ID: string;
-  ODOO_VISITOR_UUID: string;
-  ODOO_USER_ID: number | null;
+  ODOO_USERNAME: string;
+  ODOO_API_KEY: string;
   ODOO_NETWORK_MEMBER_ID: number | null;
   LOCAL_TZ: string;
   USER_EMAIL: string;
