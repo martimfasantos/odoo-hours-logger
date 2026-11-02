@@ -1,176 +1,125 @@
 <div align="center">
 
-<img src="frontend/public/favicon.svg" width="76" alt="Odoo Hours Logger" />
+<img src="frontend/public/favicon.svg" width="72" alt="Odoo Hours Logger logo" />
 
 # Odoo Hours Logger
 
-**Turn your Google Calendar into Odoo timesheets — review, then push, in a couple of clicks.**
+**Turn your Google Calendar into Odoo timesheets. Review, then push.**
 
 ![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)
 ![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white)
 ![React](https://img.shields.io/badge/React-61DAFB?logo=react&logoColor=black)
 ![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white)
-![Vite](https://img.shields.io/badge/Vite-646CFF?logo=vite&logoColor=white)
-![tests](https://img.shields.io/badge/tests-243%20passing-2ea44f)
-![database](https://img.shields.io/badge/database-none-lightgrey)
+
+<img src="docs/images/log-hours.png" width="860" alt="Log Hours: calendar events mapped to Odoo contracts, ready to push" />
+
+<sub>Screenshots use the built-in demo data.</sub>
 
 </div>
 
-> Reads your Google Calendar, maps each event to an Odoo **contract** via keyword rules, lets you
-> **review** the proposed entries, then **pushes** them to Odoo's timesheet. Runs entirely locally —
-> no database, no LLM. Plain keyword matching, plain JSON state files.
+## What it does
 
-<p align="center">
-  <img src="docs/images/log-hours.png" width="840" alt="Log Hours — review calendar events mapped to contracts, then push" />
-</p>
+Reads your Google Calendar, maps each event to an Odoo **contract** with keyword rules, lets you **review** the proposed entries, then **pushes** them to Odoo's timesheet. It runs locally: plain keyword matching, plain JSON state files, no database, no LLM.
 
-<p align="center"><sub>All screenshots use built-in <b>demo data</b>.</sub></p>
+1. **Import**: pick a date range and refresh; events come from your calendar's secret iCal URL.
+2. **Match**: keyword rules map each event title to a contract (first match wins); filter words drop noise like "Lunch".
+3. **Review**: change the contract or description, remove stray events, approve what you want.
+4. **Push**: approved entries are created in Odoo. Rows already logged are greyed out, so re-imports never double-log.
 
-## ✨ Features
+## Features
 
-- 📅 **Calendar import** from your Google Calendar's secret iCal URL — recurring events expanded; all-day & declined events skipped.
-- 🏷️ **Keyword → contract rules** with per-contract **colors**; events auto-match as you type a range.
-- ✅ **Review, then push** — global / per-week / per-day / per-row approve, with dedup so you never double-log.
-- 🗓️ **List _and_ calendar views**, colour-coded by contract, with side-by-side overlaps.
-- 📊 **Logged overview** — per-contract **logged vs. to-be-logged** hours, month-to-date.
-- 🧹 **Filter words** to skip non-work events (e.g. _"Out of Office"_, _"Lunch"_).
-- ⚙️ **Editable, masked settings** saved to `.env`, with a step-by-step guide for creating your Odoo API key.
-- 🔌 **Odoo API-key sign-in** with a clear **"check your VPN"** prompt when Odoo is unreachable.
-- 🧪 **Demo mode** + a full test suite (**127** backend, **116** frontend).
+- **Calendar import** with recurring events expanded; all-day and declined events skipped.
+- **Keyword rules** with per-contract colors. When you pick a contract by hand, the app offers to save it as a rule.
+- **Contract warnings**: rules pointing at an ended contract and rows outside a contract's dates are flagged, with a reassign dropdown.
+- **Review before push**: approve all, per week, per day, or per row.
+- **List and calendar views**, color-coded by contract, with overlaps shown side by side.
+- **Logged overview**: logged vs. to-be-logged hours per contract, with a calendar of the blocks.
+- **Analytics**: a stacked column chart over time (day, week or month; by project or billable; hours, revenue, cost or margin) and a per-project table.
+- **API-key sign-in** to Odoo, with a "check your VPN" prompt when Odoo is unreachable.
+- **Demo mode**: runs on sample contracts and events, no Odoo or calendar needed.
 
-## 📸 Screenshots
+## Screenshots
 
 <table>
   <tr>
     <td width="50%"><img src="docs/images/calendar.png" alt="Calendar view" /></td>
+    <td width="50%"><img src="docs/images/analytics.png" alt="Analytics" /></td>
+  </tr>
+  <tr>
+    <td align="center"><b>Calendar view</b><br />Blocks color-coded by contract</td>
+    <td align="center"><b>Analytics</b><br />Hours, revenue, cost and margin over time</td>
+  </tr>
+  <tr>
     <td width="50%"><img src="docs/images/logged.png" alt="Logged overview" /></td>
-  </tr>
-  <tr>
-    <td align="center"><b>Calendar view</b> — blocks colour-coded by contract</td>
-    <td align="center"><b>Logged</b> — logged vs. to-be-logged per contract</td>
-  </tr>
-  <tr>
     <td width="50%"><img src="docs/images/mapping-rules.png" alt="Mapping rules" /></td>
-    <td width="50%"><img src="docs/images/settings.png" alt="Settings" /></td>
   </tr>
   <tr>
-    <td align="center"><b>Mapping rules</b> — keyword → contract + filter words</td>
-    <td align="center"><b>Settings</b> — masked config, editable, saved to <code>.env</code></td>
+    <td align="center"><b>Logged</b><br />Logged vs. to-be-logged per contract</td>
+    <td align="center"><b>Mapping rules</b><br />Keywords to contracts, with filter words</td>
   </tr>
 </table>
 
-## 🚀 Quick start
+## Quick start
+
+You need Python 3.12+ and Node.js.
 
 ```bash
-# 1. Backend
+# Backend
 cd backend && python -m venv .venv && . .venv/bin/activate && pip install -e ".[dev]"
 
-# 2. Frontend
+# Frontend
 cd ../frontend && npm install
 
-# 3. Config — copy the template and fill it in (or edit later in the Settings tab)
-cp backend/.env.example backend/.env
+# Config (or fill it in later from the Settings tab)
+cd .. && cp backend/.env.example backend/.env
 
-# 4. Run both (backend :8010 + frontend :5173)
+# Run both: backend on :8010, frontend on :5173
 ./run.sh
 ```
 
-Then open **http://localhost:5173**.
+Open **http://localhost:5173**.
 
-**Just want to look around?** Set `DEMO_MODE=true` in `backend/.env` — the app runs on sample
-contracts and events with a simulated push (no Odoo or calendar needed). All the screenshots above
-are demo mode.
+**Just looking around?** Set `DEMO_MODE=true` in `backend/.env` to run on sample data with a simulated push.
 
-> **Configuration:** the key values are your Google Calendar **secret iCal URL** and your Odoo
-> sign-in: your Odoo **login + API key** (it does not expire, and the Settings tab walks you
-> through creating one). Full variable reference and the technical details are in
-> **[`docs/GUIDE.md`](docs/GUIDE.md)**.
+### Configuration
 
-## 🖥️ Desktop app (macOS)
+| Setting | Where to get it |
+|---|---|
+| `GOOGLE_CALENDAR_URL` | Google Calendar → Settings → your calendar → Integrate calendar → **Secret address in iCal format** |
+| `ODOO_USERNAME` | Your Odoo login email |
+| `ODOO_API_KEY` | Open `<ODOO_URL>/web?debug=1` → avatar → My Profile → Account Security → Developer API Keys → **New API Key** (the Settings tab walks you through it) |
 
-Build a standalone `Odoo Hours Logger.app` you can keep in `/Applications` and
-launch like any other app — no terminal, no repo needed at runtime.
+You can edit everything in the **Settings** tab; it saves to `backend/.env` and applies immediately. The full variable reference and the technical walkthrough are in [`docs/GUIDE.md`](docs/GUIDE.md).
 
-### Install on your Mac (from a fresh clone)
+## Desktop app (macOS)
 
-End-to-end — from nothing to an app sitting in `/Applications`:
+Build a standalone `Odoo Hours Logger.app` that you can keep in `/Applications`, with no terminal needed at runtime.
 
 ```bash
-# 1. Clone
-git clone https://github.com/martimfasantos/odoo-hours-logger.git
-cd odoo-hours-logger
+# After the Quick start setup above, add the build tools
+cd backend && . .venv/bin/activate && pip install -e ".[dev,packaging]" && cd ..
 
-# 2. One-time setup — backend venv + build tools (PyInstaller, pywebview), then frontend deps
-cd backend && python -m venv .venv && . .venv/bin/activate && pip install -e ".[dev,packaging]"
-cd ../frontend && npm install && cd ..
+brew install librsvg    # optional: generates the app icon
+./build_app.sh          # builds dist-app/Odoo Hours Logger.app
 
-# 3. Configure — your Google Calendar iCal URL + Odoo login and API key (or fill these in later in Settings)
-cp backend/.env.example backend/.env   # then edit backend/.env
-
-# 4. (optional) prettier app icon
-brew install librsvg
-
-# 5. Build the .app
-./build_app.sh
-
-# 6. Drop it into /Applications
 mv "dist-app/Odoo Hours Logger.app" /Applications/
-
-# 7. Launch it — first time: right-click in Finder → Open (unsigned, Gatekeeper warns once)
-open "/Applications/Odoo Hours Logger.app"
 ```
 
-During the build your `backend/.env` and `backend/data/` are copied once into
-`~/Library/Application Support/Odoo Hours Logger/` — so the installed app is
-already configured on first launch and reads/writes its data there afterwards.
-After pulling new changes, just re-run `./build_app.sh` and copy the rebuilt
-app over; your config in Application Support is left untouched.
+- **First launch:** the app is unsigned, so right-click it in Finder → **Open** once to get past Gatekeeper.
+- **Config and data:** the first build copies your `backend/.env` and `backend/data/` to `~/Library/Application Support/Odoo Hours Logger/`. The installed app reads and writes there, and rebuilding leaves it untouched.
+- **Odoo access:** the company VPN is still required.
 
-### Build
+## Tech stack
 
-```bash
-./build_app.sh
-```
+| | |
+|---|---|
+| **Backend** | Python 3.12, FastAPI, httpx, icalendar and recurring-ical-events, Odoo web JSON-RPC, JSON files |
+| **Frontend** | React, TypeScript, Vite, plain CSS design system |
+| **Tests** | pytest, Vitest and React Testing Library |
 
-This builds the frontend, bundles the Python backend + UI with PyInstaller, and
-produces `dist-app/Odoo Hours Logger.app`. Optional: `brew install librsvg` for
-a custom app icon (otherwise the default icon is used).
-
-On the first build your existing `backend/.env` and `backend/data/` are copied
-once into `~/Library/Application Support/Odoo Hours Logger/`, which is where the
-installed app reads and writes its config and data thereafter.
-
-### First launch
-
-The app is unsigned, so the first time, **right-click it → Open** and confirm
-(Gatekeeper warns once). After that, double-click as usual. The company VPN is
-still required to reach Odoo.
-
-### Development
-
-Packaging changes nothing about development — keep using `./run.sh` (FastAPI on
-:8010 + Vite on :5173).
-
-## 🧭 How it works
-
-1. **Import** — pick a date range, _Refresh from calendar_; events are fetched from the iCal URL and parsed.
-2. **Match** — keyword rules map each event title to an Odoo contract (first matching rule wins); filter words drop noise.
-3. **Review** — adjust contracts/descriptions, remove stray events, approve what you want.
-4. **Push** — approved entries are created in Odoo (`timesheet_entry`); already-logged rows are greyed out so re-imports never double-log.
-
-Full technical walkthrough — Odoo API-key auth, how contracts are fetched, calendar parsing, rules,
-dedup, the Logged overview — in **[`docs/GUIDE.md`](docs/GUIDE.md)**.
-
-## 🛠️ Tech stack
-
-**Backend:** Python 3.12 · FastAPI · httpx · icalendar + recurring-ical-events · Odoo web JSON-RPC ·
-plain JSON files (no database).
-**Frontend:** React · TypeScript · Vite · plain CSS design system.
-**Tests:** pytest (backend) · Vitest + React Testing Library (frontend).
-
-## ✅ Tests
+## Tests
 
 ```bash
-cd backend && . .venv/bin/activate && pytest    # 127 passing
-cd frontend && npm test                          # 116 passing
+cd backend && . .venv/bin/activate && pytest
+cd frontend && npm test
 ```

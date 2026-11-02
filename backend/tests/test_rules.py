@@ -9,10 +9,10 @@ def _store(tmp_path):
     return RulesStore(tmp_path / "rules.json")
 
 
-def _payload(name="GreenVolt"):
+def _payload(name="Client A"):
     return RuleCreate(
-        name=name, keywords=["greenvolt"], contract_id=10,
-        contract_name="[10] GreenVolt",
+        name=name, keywords=["client a"], contract_id=10,
+        contract_name="[10] Client A",
     )
 
 
@@ -39,8 +39,8 @@ def test_update_changes_fields(tmp_path):
     s = _store(tmp_path)
     r = s.create(_payload())
     updated = s.update(r.id, RuleCreate(
-        name="GreenVolt", keywords=["gv", "greenvolt"], contract_id=10,
-        contract_name="[10] GreenVolt",
+        name="Client A", keywords=["gv", "client a"], contract_id=10,
+        contract_name="[10] Client A",
     ))
     assert "gv" in updated.keywords
 
@@ -64,7 +64,7 @@ def test_list_skips_stale_old_shaped_rules(tmp_path):
     # the second is a valid contract-based rule.
     path.write_text(json.dumps([
         {"id": 1, "name": "Legacy", "keywords": ["x"],
-         "project_id": 101, "project_name": "GreenVolt",
+         "project_id": 101, "project_name": "Client A",
          "task_id": None, "task_name": None, "priority": 100, "active": True},
         {"id": 2, "name": "New", "keywords": ["y"],
          "contract_id": 50, "contract_name": "[50] Client", "priority": 1,
