@@ -87,7 +87,7 @@ Open **http://localhost:5173**.
 |---|---|
 | `GOOGLE_CALENDAR_URL` | Google Calendar → Settings → your calendar → Integrate calendar → **Secret address in iCal format** |
 | `ODOO_USERNAME` | Your Odoo login email |
-| `ODOO_API_KEY` | Odoo → avatar → My Profile → Account Security → **New API Key** (the Settings tab walks you through it) |
+| `ODOO_API_KEY` | Open `<ODOO_URL>/web?debug=1` → avatar → My Profile → Account Security → Developer API Keys → **New API Key** (the Settings tab walks you through it) |
 
 You can edit everything in the **Settings** tab; it saves to `backend/.env` and applies immediately. The full variable reference and the technical walkthrough are in [`docs/GUIDE.md`](docs/GUIDE.md).
 
@@ -108,8 +108,6 @@ mv "dist-app/Odoo Hours Logger.app" /Applications/
 - **First launch:** the app is unsigned, so right-click it in Finder → **Open** once to get past Gatekeeper.
 - **Config and data:** the first build copies your `backend/.env` and `backend/data/` to `~/Library/Application Support/Odoo Hours Logger/`. The installed app reads and writes there, and rebuilding leaves it untouched.
 - **Odoo access:** the company VPN is still required.
-
-Development is unaffected; keep using `./run.sh`.
 
 ## Tech stack
 
