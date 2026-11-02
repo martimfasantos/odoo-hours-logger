@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import json
 from pathlib import Path
 
@@ -52,3 +54,13 @@ class RulesStore:
     def delete(self, rule_id: int) -> None:
         items = [i for i in self._load_raw() if i["id"] != rule_id]
         self._save_raw(items)
+
+    def replace_all(self, rules: list[RuleCreate]) -> list[Rule]:
+        items: list[dict] = []
+        result: list[Rule] = []
+        for idx, data in enumerate(rules, start=1):
+            rule = Rule(id=idx, **data.model_dump())
+            items.append(rule.model_dump())
+            result.append(rule)
+        self._save_raw(items)
+        return result

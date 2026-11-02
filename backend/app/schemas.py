@@ -158,3 +158,18 @@ class ConfigValues(BaseModel):
     LOCAL_TZ: Optional[str] = None
     USER_EMAIL: Optional[str] = None
     DEMO_MODE: Optional[bool] = None
+
+
+class PreferencesBundle(BaseModel):
+    version: int = 1
+    rules: list[RuleCreate] = Field(default_factory=list)
+    filter_words: list[str] = Field(default_factory=list)
+    colors: dict[str, str] = Field(default_factory=dict)
+
+    @field_validator("colors")
+    @classmethod
+    def _hex_colors(cls, v: dict[str, str]) -> dict[str, str]:
+        for key, color in v.items():
+            if not re.fullmatch(r"#[0-9a-fA-F]{6}", color):
+                raise ValueError(f"color for {key} must be a #RRGGBB hex string")
+        return v

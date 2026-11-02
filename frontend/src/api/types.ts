@@ -40,6 +40,13 @@ export interface Rule {
 
 export type RuleCreate = Omit<Rule, "id">;
 
+export interface PreferencesBundle {
+  version: number;
+  rules: Rule[];
+  filter_words: string[];
+  colors: Record<string, string>;
+}
+
 export interface PushEntry {
   uid: string;
   start: string;

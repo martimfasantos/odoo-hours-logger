@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { Plus, Pencil, Trash2, X, Check, AlertTriangle } from "lucide-react";
+import { Plus, Pencil, Trash2, X, Check, Download, Upload, AlertTriangle } from "lucide-react";
 import { api } from "../api/client";
-import type { OdooRef, Rule, RuleCreate } from "../api/types";
+import type { OdooRef, PreferencesBundle, Rule, RuleCreate } from "../api/types";
 import { useToast } from "../components/Toast";
 import Button from "../components/Button";
 import Badge from "../components/Badge";
@@ -64,6 +64,9 @@ export default function MappingRules() {
   const [newWord, setNewWord] = useState("");
   const [savingIgnore, setSavingIgnore] = useState(false);
   const newWordInputRef = useRef<HTMLInputElement>(null);
+
+  const [importing, setImporting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     fetchRules();
@@ -241,6 +244,87 @@ export default function MappingRules() {
     }
   }
 
+  const hasAnyPrefs =
+    rules.length > 0 ||
+    ignoreKeywords.length > 0 ||
+    Object.keys(colors).length > 0;
+
+  /** Download all Mappings-tab preferences as one JSON file. */
+  function handleExport() {
+    const bundle: PreferencesBundle = {
+      version: 1,
+      rules,
+      filter_words: ignoreKeywords,
+      colors,
+    };
+    const json = JSON.stringify(bundle, null, 2);
+    const blob = new Blob([json], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "mapping-preferences.json";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    toast.success(
+      `Exported ${rules.length} rule${rules.length === 1 ? "" : "s"}, ` +
+        `${ignoreKeywords.length} filter word${ignoreKeywords.length === 1 ? "" : "s"}.`,
+    );
+  }
+
+  /** Read a preferences file, confirm, then replace all preferences with it. */
+  async function handleImportFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    // Reset so selecting the same file again still fires onChange.
+    e.target.value = "";
+    if (!file) return;
+
+    let bundle: PreferencesBundle;
+    try {
+      const parsed = JSON.parse(await file.text());
+      if (
+        typeof parsed !== "object" ||
+        parsed === null ||
+        !("rules" in parsed || "filter_words" in parsed || "colors" in parsed)
+      ) {
+        throw new Error("Not a preferences file");
+      }
+      bundle = {
+        version: parsed.version ?? 1,
+        rules: parsed.rules ?? [],
+        filter_words: parsed.filter_words ?? [],
+        colors: parsed.colors ?? {},
+      };
+    } catch {
+      toast.error(
+        "Could not read that file — expected a preferences JSON export.",
+      );
+      return;
+    }
+
+    const ok = window.confirm(
+      "Import will replace ALL current mapping rules, filter words, and colors " +
+        "with the contents of this file. This cannot be undone. Continue?",
+    );
+    if (!ok) return;
+
+    setImporting(true);
+    try {
+      await api.importPreferences(bundle);
+      await Promise.all([
+        fetchRules(),
+        api.getIgnoreKeywords().then(setIgnoreKeywords),
+        api.getColors().then(setColors),
+      ]);
+      toast.success("Preferences imported.");
+    } catch (err) {
+      toast.error(`Failed to import preferences: ${String(err)}`);
+    } finally {
+      setImporting(false);
+    }
+  }
+
   async function handleDelete(id: number) {
     if (!window.confirm("Delete this rule? This cannot be undone.")) return;
     setDeletingId(id);
@@ -266,6 +350,38 @@ export default function MappingRules() {
           <p className="page__subtitle">
             Keywords matched against calendar events to suggest an Odoo contract.
           </p>
+        </div>
+        <div style={{ display: "flex", gap: "var(--space-3)" }}>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="application/json,.json"
+            className="sr-only"
+            tabIndex={-1}
+            aria-hidden="true"
+            onChange={handleImportFile}
+          />
+          <Button
+            variant="secondary"
+            size="sm"
+            aria-label="Import preferences from JSON"
+            loading={importing}
+            disabled={importing}
+            onClick={() => fileInputRef.current?.click()}
+          >
+            {!importing && <Upload size={14} aria-hidden="true" />}
+            Import
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
+            aria-label="Export preferences as JSON"
+            disabled={!hasAnyPrefs || importing}
+            onClick={handleExport}
+          >
+            <Download size={14} aria-hidden="true" />
+            Export
+          </Button>
         </div>
       </header>
 

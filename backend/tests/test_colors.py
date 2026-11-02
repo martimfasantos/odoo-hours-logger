@@ -52,3 +52,18 @@ def test_set_overwrites_existing_color(tmp_path):
     store.set(101, "#3B82F6")
     store.set(101, "#D97706")
     assert store.get_all() == {"101": "#D97706"}
+
+
+def test_replace_all_overwrites_everything(tmp_path):
+    store = ColorStore(tmp_path / "colors.json")
+    store.set(101, "#3B82F6")
+    result = store.replace_all({"202": "#D97706"})
+    assert result == {"202": "#D97706"}
+    assert store.get_all() == {"202": "#D97706"}
+
+
+def test_replace_all_empty_clears(tmp_path):
+    store = ColorStore(tmp_path / "colors.json")
+    store.set(101, "#3B82F6")
+    store.replace_all({})
+    assert store.get_all() == {}

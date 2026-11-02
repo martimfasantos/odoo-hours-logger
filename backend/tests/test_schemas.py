@@ -1,6 +1,9 @@
 from datetime import date, datetime
 
-from app.schemas import CalendarEvent, OdooRef, PushEntry, RuleCreate
+import pytest
+from pydantic import ValidationError
+
+from app.schemas import CalendarEvent, OdooRef, PreferencesBundle, PushEntry, RuleCreate
 
 
 def test_calendar_event_roundtrip():
@@ -41,3 +44,25 @@ def test_push_entry_requires_contract():
 def test_odoo_ref_coerces_falsy_name():
     ref = OdooRef(id=5, name=False)
     assert ref.name == ""
+
+
+def test_preferences_bundle_defaults():
+    b = PreferencesBundle()
+    assert b.version == 1
+    assert b.rules == []
+    assert b.filter_words == []
+    assert b.colors == {}
+
+
+def test_preferences_bundle_ignores_rule_id():
+    b = PreferencesBundle(rules=[{
+        "id": 99, "name": "Client A", "keywords": ["gv"],
+        "contract_id": 10, "contract_name": "[10] Client A", "active": True,
+    }])
+    assert b.rules[0].name == "Client A"
+    assert not hasattr(b.rules[0], "id")
+
+
+def test_preferences_bundle_rejects_bad_color():
+    with pytest.raises(ValidationError):
+        PreferencesBundle(colors={"10": "blue"})

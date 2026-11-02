@@ -28,3 +28,8 @@ class ColorStore:
         data = self._load()
         data[str(project_id)] = color
         self._save(data)
+
+    def replace_all(self, colors: dict[str, str]) -> dict[str, str]:
+        data = {str(k): v for k, v in colors.items()}
+        self._save(data)
+        return data
