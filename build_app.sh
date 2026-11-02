@@ -27,7 +27,9 @@ if [ ! -f "$APP_SUPPORT/.env" ]; then
     echo "      WARNING: backend/.env not found; not seeded. Configure the app on first launch via Settings."
   fi
   if [ -d "$ROOT/backend/data" ]; then
-    cp -R "$ROOT/backend/data" "$APP_SUPPORT/data" && echo "      copied data/"
+    # ditto copies the CONTENTS of backend/data into <AS>/data (creating it),
+    # so it never nests a data/data/ even if <AS>/data already exists.
+    ditto "$ROOT/backend/data" "$APP_SUPPORT/data" && echo "      copied data/"
   else
     echo "      note: backend/data/ not found; starting with empty data."
   fi
