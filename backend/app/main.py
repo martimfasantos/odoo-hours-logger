@@ -24,7 +24,7 @@ from app.rules import RulesStore
 from app.schemas import (
     AnalyticsResponse, CalendarEvent, ColorUpdate, ConfigValues, ContractOverview,
     ContractTotal, ExcludedEntryRef, OdooRef, OverviewBlock, OverviewResponse,
-    ProposedEntry, PushEntry, PushResult, RemovedEvent, Rule, RuleCreate,
+    PreferencesBundle, ProposedEntry, PushEntry, PushResult, RemovedEvent, Rule, RuleCreate,
 )
 
 @asynccontextmanager
@@ -500,6 +500,22 @@ def set_color(project_id: int, body: ColorUpdate,
               colors: ColorStore = Depends(deps.colors_store)):
     colors.set(project_id, body.color)
     return colors.get_all()
+
+
+@app.put("/api/preferences", response_model=PreferencesBundle)
+def put_preferences(bundle: PreferencesBundle,
+                    rules: RulesStore = Depends(deps.rules_store),
+                    ignore_store: IgnoreStore = Depends(deps.ignore_store),
+                    colors: ColorStore = Depends(deps.colors_store)):
+    saved_rules = rules.replace_all(bundle.rules)
+    saved_words = ignore_store.set(bundle.filter_words)
+    saved_colors = colors.replace_all(bundle.colors)
+    return PreferencesBundle(
+        version=bundle.version,
+        rules=[RuleCreate(**r.model_dump()) for r in saved_rules],
+        filter_words=saved_words,
+        colors=saved_colors,
+    )
 
 
 @app.post("/api/timesheet/push", response_model=PushResponse)

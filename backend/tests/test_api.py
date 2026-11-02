@@ -84,6 +84,40 @@ def test_rules_crud_flow(client):
     assert c.get("/api/rules").json() == []
 
 
+def test_put_preferences_replaces_all(client):
+    c, _, _ = client
+    # Seed pre-existing state that the import must wipe.
+    c.post("/api/rules", json={"name": "Old", "keywords": ["old"],
+                               "contract_id": 10, "contract_name": "[10] Client A"})
+    c.put("/api/ignore", json={"keywords": ["Stale"]})
+    c.put("/api/colors/10", json={"color": "#111111"})
+
+    bundle = {
+        "version": 1,
+        "rules": [{"id": 99, "name": "New", "keywords": ["new"],
+                   "contract_id": 20, "contract_name": "[20] Beta", "active": True}],
+        "filter_words": ["Lunch"],
+        "colors": {"20": "#7dd3fc"},
+    }
+    resp = c.put("/api/preferences", json=bundle)
+    assert resp.status_code == 200
+    body = resp.json()
+    assert [r["name"] for r in body["rules"]] == ["New"]
+    assert "id" not in body["rules"][0]
+
+    rules = c.get("/api/rules").json()
+    assert [r["name"] for r in rules] == ["New"]
+    assert rules[0]["id"] == 1  # reassigned, old rule gone
+    assert c.get("/api/ignore").json() == ["Lunch"]
+    assert c.get("/api/colors").json() == {"20": "#7dd3fc"}
+
+
+def test_put_preferences_rejects_bad_color(client):
+    c, _, _ = client
+    resp = c.put("/api/preferences", json={"colors": {"10": "notahex"}})
+    assert resp.status_code == 422
+
+
 def test_analytics_endpoint(client):
     c, fake_odoo, _ = client
     fake_odoo.existing_entries.return_value = [

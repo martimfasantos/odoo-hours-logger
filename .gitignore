@@ -20,6 +20,9 @@ dist/
 .idea/
 .vscode/
 
+# Superpowers working docs (specs/plans)
+docs/superpowers/
+
 # Desktop app build artifacts
 /dist-app/
 /build-app/

@@ -15,6 +15,7 @@ vi.mock("../api/client", () => ({
     updateRule: vi.fn(),
     deleteRule: vi.fn(),
     setIgnoreKeywords: vi.fn(),
+    importPreferences: vi.fn(),
   },
 }));
 
@@ -47,6 +48,9 @@ beforeEach(() => {
     active: true,
   });
   vi.mocked(api.setIgnoreKeywords).mockResolvedValue(["Lunch"]);
+  vi.mocked(api.importPreferences).mockResolvedValue({
+    version: 1, rules: [], filter_words: [], colors: {},
+  });
 });
 
 describe("MappingRules page", () => {
@@ -140,6 +144,118 @@ describe("MappingRules page", () => {
     await waitFor(() => {
       expect(api.setIgnoreKeywords).toHaveBeenCalledWith(["Lunch"]);
     });
+  });
+
+  it("disables Export when there are no preferences at all", async () => {
+    renderMappingRules();
+    await waitFor(() => {
+      expect(screen.getByText(/No mapping rules yet/i)).toBeInTheDocument();
+    });
+    expect(
+      screen.getByRole("button", { name: /Export preferences as JSON/i })
+    ).toBeDisabled();
+  });
+
+  it("exports rules, filter words, and colors as one JSON bundle", async () => {
+    const RULES = [
+      {
+        id: 1,
+        name: "Client A",
+        keywords: ["client a"],
+        contract_id: 2377,
+        contract_name: "Client A",
+        active: true,
+      },
+    ];
+    vi.mocked(api.listRules).mockResolvedValue(RULES);
+    vi.mocked(api.getIgnoreKeywords).mockResolvedValue(["Lunch"]);
+    vi.mocked(api.getColors).mockResolvedValue({ "2377": "#7dd3fc" });
+
+    // jsdom doesn't implement object URLs; capture the blob that's exported.
+    let captured: Blob | null = null;
+    const createObjectURL = vi.fn((b: Blob) => {
+      captured = b;
+      return "blob:mock";
+    });
+    const revokeObjectURL = vi.fn();
+    vi.stubGlobal("URL", { ...URL, createObjectURL, revokeObjectURL });
+    const clickSpy = vi
+      .spyOn(HTMLAnchorElement.prototype, "click")
+      .mockImplementation(() => {});
+
+    renderMappingRules();
+    const exportBtn = await screen.findByRole("button", {
+      name: /Export preferences as JSON/i,
+    });
+    await waitFor(() => expect(exportBtn).toBeEnabled());
+    await userEvent.click(exportBtn);
+
+    expect(createObjectURL).toHaveBeenCalledTimes(1);
+    expect(clickSpy).toHaveBeenCalledTimes(1);
+    expect(revokeObjectURL).toHaveBeenCalledWith("blob:mock");
+    expect(captured).toBeInstanceOf(Blob);
+    const text = await (captured as unknown as Blob).text();
+    expect(JSON.parse(text)).toEqual({
+      version: 1,
+      rules: RULES,
+      filter_words: ["Lunch"],
+      colors: { "2377": "#7dd3fc" },
+    });
+
+    clickSpy.mockRestore();
+    vi.unstubAllGlobals();
+  });
+
+  it("imports a preferences file after confirmation", async () => {
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
+
+    renderMappingRules();
+    await screen.findByRole("button", {
+      name: /Import preferences from JSON/i,
+    });
+
+    const fileInput = document.querySelector(
+      'input[type="file"]'
+    ) as HTMLInputElement;
+    const file = new File(
+      [JSON.stringify({ version: 1, rules: [], filter_words: ["Lunch"], colors: {} })],
+      "prefs.json",
+      { type: "application/json" }
+    );
+    await userEvent.upload(fileInput, file);
+
+    await waitFor(() => {
+      expect(api.importPreferences).toHaveBeenCalledTimes(1);
+    });
+    expect(confirmSpy).toHaveBeenCalled();
+    const [arg] = vi.mocked(api.importPreferences).mock.calls[0];
+    expect(arg).toMatchObject({ filter_words: ["Lunch"] });
+
+    confirmSpy.mockRestore();
+  });
+
+  it("does not import when confirmation is cancelled", async () => {
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
+
+    renderMappingRules();
+    await screen.findByRole("button", {
+      name: /Import preferences from JSON/i,
+    });
+
+    const fileInput = document.querySelector(
+      'input[type="file"]'
+    ) as HTMLInputElement;
+    const file = new File(
+      [JSON.stringify({ version: 1, rules: [], filter_words: [], colors: {} })],
+      "prefs.json",
+      { type: "application/json" }
+    );
+    await userEvent.upload(fileInput, file);
+
+    await waitFor(() => expect(confirmSpy).toHaveBeenCalled());
+    expect(api.importPreferences).not.toHaveBeenCalled();
+
+    confirmSpy.mockRestore();
   });
 
   describe("contract status warnings", () => {

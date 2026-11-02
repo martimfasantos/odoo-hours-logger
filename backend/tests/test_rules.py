@@ -52,6 +52,21 @@ def test_delete_removes_rule(tmp_path):
     assert s.list() == []
 
 
+def test_replace_all_reassigns_ids_and_overwrites(tmp_path):
+    s = _store(tmp_path)
+    s.create(_payload("Old"))
+    result = s.replace_all([_payload("A"), _payload("B")])
+    assert [r.id for r in result] == [1, 2]
+    assert [r.name for r in s.list()] == ["A", "B"]
+
+
+def test_replace_all_empty_clears(tmp_path):
+    s = _store(tmp_path)
+    s.create(_payload("Old"))
+    s.replace_all([])
+    assert s.list() == []
+
+
 def test_corrupt_file_returns_empty(tmp_path):
     path = tmp_path / "rules.json"
     path.write_text("{not json")
