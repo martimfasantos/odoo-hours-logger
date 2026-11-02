@@ -1,5 +1,5 @@
 # backend/tests/test_odoo_client.py
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
 import httpx
 import pytest
@@ -165,8 +165,21 @@ def test_list_contracts_parses_rows():
     assert _execute_kw(http.calls[1]) == (
         "contract", "search_read",
         [[["network_member", "=", 1095]]],
-        {"fields": ["display_name"], "order": "display_name", "limit": 500},
+        {"fields": ["display_name", "start_date", "end_date"],
+         "order": "display_name", "limit": 500},
     )
+
+
+def test_list_contracts_maps_dates_and_false_to_none():
+    c, _ = _client([_ok(UID), _ok([
+        {"id": 10, "display_name": "[10] A",
+         "start_date": "2025-09-19", "end_date": "2026-09-18"},
+        {"id": 20, "display_name": "[20] B",
+         "start_date": False, "end_date": False},
+    ])], network_member_id=1095)
+    a, b = c.list_contracts()
+    assert (a.start_date, a.end_date) == (date(2025, 9, 19), date(2026, 9, 18))
+    assert (b.start_date, b.end_date) == (None, None)
 
 
 def test_list_contracts_applies_ilike_query():

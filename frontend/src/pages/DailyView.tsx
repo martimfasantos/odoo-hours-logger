@@ -14,6 +14,8 @@ import Badge from "../components/Badge";
 import Spinner from "../components/Spinner";
 import VpnModal from "../components/VpnModal";
 import OdooAuthModal from "../components/OdooAuthModal";
+import ContractDateWarning from "../components/ContractDateWarning";
+import { contractOptionLabel } from "../lib/contractStatus";
 import DailyCalendar from "./DailyCalendar";
 import { colorForContract, UNASSIGNED_COLOR } from "../lib/colors";
 import { isUnreachableError, isOdooAuthError } from "../lib/errors";
@@ -955,7 +957,7 @@ export default function DailyView() {
                                       <option value="">— Select contract —</option>
                                       {contracts.map((c) => (
                                         <option key={c.id} value={c.id}>
-                                          {c.name}
+                                          {contractOptionLabel(c, p.event.date)}
                                         </option>
                                       ))}
                                     </select>
@@ -997,6 +999,13 @@ export default function DailyView() {
                                         />
                                         Overlap
                                       </Badge>
+                                    )}
+                                    {!p.already_logged && (
+                                      <ContractDateWarning
+                                        contractId={r?.contractId ?? null}
+                                        contracts={contracts}
+                                        date={p.event.date}
+                                      />
                                     )}
                                     {result &&
                                       (result.success ? (

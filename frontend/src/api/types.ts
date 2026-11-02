@@ -1,4 +1,10 @@
-export interface OdooRef { id: number; name: string; }
+export interface OdooRef {
+  id: number;
+  name: string;
+  /** ISO YYYY-MM-DD, inclusive. */
+  start_date?: string | null;
+  end_date?: string | null;
+}
 
 export interface CalendarEvent {
   uid: string;

@@ -124,10 +124,13 @@ class OdooClient:
         rows = self.call_kw(
             "contract", "search_read",
             [domain],
-            {"fields": ["display_name"], "order": "display_name",
-             "limit": limit},
+            {"fields": ["display_name", "start_date", "end_date"],
+             "order": "display_name", "limit": limit},
         )
-        return [OdooRef(id=row["id"], name=row.get("display_name") or "")
+        # Odoo sends `false` for an empty date field.
+        return [OdooRef(id=row["id"], name=row.get("display_name") or "",
+                        start_date=row.get("start_date") or None,
+                        end_date=row.get("end_date") or None)
                 for row in rows]
 
     def existing_entries(self, start: datetime, end: datetime) -> list[dict]:
