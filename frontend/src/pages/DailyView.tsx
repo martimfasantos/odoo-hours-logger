@@ -15,10 +15,12 @@ import Spinner from "../components/Spinner";
 import VpnModal from "../components/VpnModal";
 import OdooAuthModal from "../components/OdooAuthModal";
 import ContractDateWarning from "../components/ContractDateWarning";
+import SaveRulePrompt from "../components/SaveRulePrompt";
 import { contractOptionLabel } from "../lib/contractStatus";
 import DailyCalendar from "./DailyCalendar";
 import { colorForContract, UNASSIGNED_COLOR } from "../lib/colors";
 import { isUnreachableError, isOdooAuthError } from "../lib/errors";
+import { rowKey } from "../lib/rows";
 import { useLogHours, type RowState } from "../state/LogHoursContext";
 import {
   startOfWeek,
@@ -28,8 +30,6 @@ import {
   formatHours,
   formatWeekRange,
 } from "../lib/dates";
-
-const rowKey = (p: ProposedEntry) => `${p.event.uid}|${p.event.start}`;
 
 /**
  * Recompute the `overlaps` flag for a set of proposals using the same
@@ -139,6 +139,7 @@ export default function DailyView() {
     setCalendarWeekStart,
     hasFetched,
     setHasFetched,
+    dismissedRulePrompts,
   } = useLogHours();
 
   // Transient/derived state stays local: re-fetched cheaply on mount and never
@@ -159,6 +160,9 @@ export default function DailyView() {
 
   // Which row's action menu is currently open (only one at a time).
   const [openMenuKey, setOpenMenuKey] = useState<string | null>(null);
+
+  // The row offering to save its manual contract pick as a rule.
+  const [rulePromptKey, setRulePromptKey] = useState<string | null>(null);
 
   // Close the open menu on outside click or Escape.
   useEffect(() => {
@@ -295,6 +299,7 @@ export default function DailyView() {
         };
       }
       setRows(init);
+      setRulePromptKey(null);
     } catch (e) {
       if (isUnreachableError(e)) setVpnOpen(true);
       toast.error(`Failed to fetch calendar: ${String(e)}`);
@@ -322,7 +327,11 @@ export default function DailyView() {
 
   function onContractChange(p: ProposedEntry, value: string) {
     const contractId = value ? Number(value) : null;
-    setRow(rowKey(p), { contractId });
+    const key = rowKey(p);
+    setRow(key, { contractId });
+    if (contractId !== null && p.match.rule_id === null && !dismissedRulePrompts.has(key)) {
+      setRulePromptKey(key);
+    }
   }
 
   /**
@@ -895,16 +904,20 @@ export default function DailyView() {
                           </tr>
                         </thead>
                         <tbody>
-                          {visibleDay.map((p) => {
+                          {visibleDay.flatMap((p) => {
                             const key = rowKey(p);
                             const r = rows[key];
                             const result = results[key];
+                            const ruleContract =
+                              rulePromptKey === key
+                                ? contracts.find((c) => c.id === r?.contractId)
+                                : undefined;
                             const rowClass = p.already_logged
                               ? "row--logged"
                               : result && !result.success
                                 ? "row--failed"
                                 : undefined;
-                            return (
+                            return [
                               <tr key={key} className={rowClass}>
                                 <td className="cell-time num">
                                   {formatTime(p.event.start)}
@@ -1075,8 +1088,17 @@ export default function DailyView() {
                                     )}
                                   </div>
                                 </td>
-                              </tr>
-                            );
+                              </tr>,
+                              ruleContract && (
+                                <SaveRulePrompt
+                                  key={`${key}|rule`}
+                                  entry={p}
+                                  contract={ruleContract}
+                                  colSpan={8}
+                                  onClose={() => setRulePromptKey(null)}
+                                />
+                              ),
+                            ];
                           })}
                         </tbody>
                       </table>

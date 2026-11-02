@@ -1813,6 +1813,25 @@ tr:last-child .row-menu {
   border-radius: 50%;
 }
 
+/* "Save as rule" prompt row under a manually mapped event (DailyView) */
+.rule-prompt-row td {
+  background: var(--color-accent-weak);
+}
+.rule-prompt {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: 0.85rem;
+  color: var(--color-fg);
+}
+.rule-prompt__keyword {
+  width: auto;
+  flex: 0 1 260px;
+  min-width: 120px;
+  font-family: var(--font-mono);
+}
+
 /* ============================================================
    Responsive
    ============================================================ */

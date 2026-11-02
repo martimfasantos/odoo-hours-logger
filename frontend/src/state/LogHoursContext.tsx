@@ -53,6 +53,9 @@ interface LogHoursContextValue {
   setRows: Dispatch<SetStateAction<Record<string, RowState>>>;
   results: Record<string, PushResult>;
   setResults: Dispatch<SetStateAction<Record<string, PushResult>>>;
+  // Rows whose "save as rule" prompt was dismissed; kept for the app session.
+  dismissedRulePrompts: ReadonlySet<string>;
+  setDismissedRulePrompts: Dispatch<SetStateAction<ReadonlySet<string>>>;
   calendarWeekStart: string;
   setCalendarWeekStart: Dispatch<SetStateAction<string>>;
   hasFetched: boolean;
@@ -78,6 +81,9 @@ export function LogHoursProvider({ children }: { children: ReactNode }) {
   const [proposals, setProposals] = useState<ProposedEntry[]>([]);
   const [rows, setRows] = useState<Record<string, RowState>>({});
   const [results, setResults] = useState<Record<string, PushResult>>({});
+  const [dismissedRulePrompts, setDismissedRulePrompts] = useState<
+    ReadonlySet<string>
+  >(() => new Set());
   const [calendarWeekStart, setCalendarWeekStart] = useState(() =>
     startOfWeek(new Date()),
   );
@@ -104,6 +110,8 @@ export function LogHoursProvider({ children }: { children: ReactNode }) {
       setRows,
       results,
       setResults,
+      dismissedRulePrompts,
+      setDismissedRulePrompts,
       calendarWeekStart,
       setCalendarWeekStart,
       hasFetched,
@@ -119,6 +127,7 @@ export function LogHoursProvider({ children }: { children: ReactNode }) {
       proposals,
       rows,
       results,
+      dismissedRulePrompts,
       calendarWeekStart,
       hasFetched,
       loggedMonthAnchor,
