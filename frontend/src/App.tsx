@@ -6,7 +6,6 @@ import {
   Tags,
   Settings as SettingsIcon,
   BarChart3,
-  Clock,
 } from "lucide-react";
 import { api } from "./api/client";
 import DailyView from "./pages/DailyView";
@@ -52,9 +51,7 @@ export default function App() {
       <div className="app">
         <aside className="sidebar">
           <div className="sidebar__brand">
-            <span className="sidebar__brand-mark" aria-hidden="true">
-              <Clock size={18} />
-            </span>
+            <img className="sidebar__brand-mark" src="/favicon.svg" alt="" />
             <span className="sidebar__title">Odoo Hours Logger</span>
           </div>
 
