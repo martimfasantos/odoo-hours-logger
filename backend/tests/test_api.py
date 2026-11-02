@@ -13,7 +13,7 @@ from app.excluded import ExcludedStore
 from app.ignore import IgnoreStore
 from app.ledger import Ledger
 from app.main import app
-from app.odoo_client import OdooClient, OdooUnreachable, OdooAuthError
+from app.odoo_client import OdooClient, OdooUnreachable, OdooAuthError, to_odoo_utc
 from app.rules import RulesStore
 from app.schemas import CalendarEvent, OdooRef
 
@@ -103,6 +103,50 @@ def test_analytics_endpoint(client):
     assert body["currency"] == "EUR"
     assert body["entries"] == [{"date": "2026-06-01", "contract_id": 10,
                                 "hours": 4.0, "revenue": 400.0, "cost": 160.0}]
+
+
+# Lisbon summer time is UTC+1. Range 2026-07-01..2026-07-03:
+# FIRST_DAY_EARLY is 00:15 local on Jul 1 (must be fetched),
+# PAST_LAST_DAY is 00:10 local on Jul 4 (must not be fetched).
+FIRST_DAY_EARLY = {"contract_id": 10, "contract_name": "[10] GreenVolt",
+                   "start_time": "2026-06-30 23:15:00",
+                   "end_time": "2026-06-30 23:45:00",
+                   "work_description": "early", "duration_h": 0.5,
+                   "internal_cost": 0.0, "external_cost": 0.0}
+PAST_LAST_DAY = {"contract_id": 10, "contract_name": "[10] GreenVolt",
+                 "start_time": "2026-07-03 23:10:00",
+                 "end_time": "2026-07-03 23:55:00",
+                 "work_description": "late", "duration_h": 0.75,
+                 "internal_cost": 0.0, "external_cost": 0.0}
+
+
+def _odoo_overlap_filter(rows):
+    """Mimic existing_entries' Odoo domain: start_time <= end, end_time >= start."""
+    def search(start, end):
+        lo, hi = to_odoo_utc(start), to_odoo_utc(end)
+        return [r for r in rows if r["start_time"] <= hi and r["end_time"] >= lo]
+    return search
+
+
+def test_analytics_uses_local_day_bounds(client):
+    c, fake_odoo, _ = client
+    fake_odoo.existing_entries.side_effect = _odoo_overlap_filter(
+        [FIRST_DAY_EARLY, PAST_LAST_DAY])
+    fake_odoo.contract_rates.return_value = {}
+    resp = c.get("/api/analytics?start=2026-07-01&end=2026-07-03")
+    assert resp.status_code == 200
+    assert [e["hours"] for e in resp.json()["entries"]] == [0.5]
+
+
+def test_overview_uses_local_day_bounds(client, monkeypatch):
+    c, fake_odoo, _ = client
+    monkeypatch.setattr("app.main._load_events",
+                        lambda start, end, settings, user_email="": [])
+    fake_odoo.existing_entries.side_effect = _odoo_overlap_filter(
+        [FIRST_DAY_EARLY, PAST_LAST_DAY])
+    resp = c.get("/api/overview?start=2026-07-01&end=2026-07-03")
+    assert resp.status_code == 200
+    assert [b["title"] for b in resp.json()["blocks"]] == ["early"]
 
 
 def test_push_creates_entry_and_records_ledger(client):
