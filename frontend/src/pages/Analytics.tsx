@@ -5,7 +5,10 @@ import type { AnalyticsResponse } from "../api/types";
 import { useToast } from "../components/Toast";
 import Button from "../components/Button";
 import Spinner from "../components/Spinner";
+import StackedColumnChart from "../components/StackedColumnChart";
 import VpnModal from "../components/VpnModal";
+import DateRangePicker from "../components/DateRangePicker";
+import { buildSeries, type Granularity, type GroupBy, type Metric } from "../lib/analyticsSeries";
 import { colorForContract } from "../lib/colors";
 import { isUnreachableError } from "../lib/errors";
 
@@ -21,34 +24,74 @@ function firstOfMonthISO(): string {
   return isoDate(new Date(d.getFullYear(), d.getMonth(), 1));
 }
 
-function fmtWeek(iso: string): string {
-  return new Date(`${iso}T00:00:00`).toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric",
-  });
+interface ChartState {
+  granularity: Granularity;
+  groupBy: GroupBy;
+  metric: Metric;
+  excluded: ReadonlySet<number>; // contract ids filtered out of chart and table
+  hidden: ReadonlySet<string>; // series ids hidden via the legend
+}
+
+const GRANULARITIES: [Granularity, string][] = [["day", "Day"], ["week", "Week"], ["month", "Month"]];
+const GROUPS: [GroupBy, string][] = [["project", "Project"], ["billable", "Billable"], ["none", "None"]];
+const METRICS: [Metric, string][] = [
+  ["hours", "Hours"], ["revenue", "Revenue"], ["cost", "Cost"], ["margin", "Margin"],
+];
+
+function toggled<T>(set: ReadonlySet<T>, v: T): Set<T> {
+  const next = new Set(set);
+  if (!next.delete(v)) next.add(v);
+  return next;
+}
+
+function Segmented<T extends string>({ label, options, value, onChange }: {
+  label: string;
+  options: [T, string][];
+  value: T;
+  onChange: (v: T) => void;
+}) {
+  return (
+    <div className="view-toggle view-toggle--sm" role="group" aria-label={label}>
+      {options.map(([v, text]) => (
+        <button
+          key={v}
+          type="button"
+          className={`view-toggle__btn${v === value ? " is-active" : ""}`}
+          aria-pressed={v === value}
+          onClick={() => onChange(v)}
+        >
+          {text}
+        </button>
+      ))}
+    </div>
+  );
 }
 
 export default function Analytics() {
   const toast = useToast();
   const [from, setFrom] = useState(firstOfMonthISO());
   const [to, setTo] = useState(isoDate(new Date()));
-  const [data, setData] = useState<AnalyticsResponse | null>(null);
+  // The range is kept with the response so the chart's periods match the data, not unsaved picker edits.
+  const [data, setData] = useState<{ response: AnalyticsResponse; from: string; to: string } | null>(null);
   const [colors, setColors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
   const [vpnOpen, setVpnOpen] = useState(false);
+  const [chart, setChart] = useState<ChartState>({
+    granularity: "week",
+    groupBy: "project",
+    metric: "hours",
+    excluded: new Set(),
+    hidden: new Set(),
+  });
 
   useEffect(() => {
     api.getColors().then(setColors).catch(() => setColors({}));
   }, []);
 
   async function load() {
-    if (from > to) {
-      toast.error('"From" must be on or before "To".');
-      return;
-    }
     setLoading(true);
     try {
-      setData(await api.analytics(from, to));
+      setData({ response: await api.analytics(from, to), from, to });
     } catch (e) {
       if (isUnreachableError(e)) setVpnOpen(true);
       toast.error(`Failed to load analytics: ${String(e)}`);
@@ -63,7 +106,7 @@ export default function Analytics() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const currency = data?.currency ?? "EUR";
+  const currency = data?.response.currency ?? "EUR";
   const money = (n: number) =>
     new Intl.NumberFormat(undefined, {
       style: "currency",
@@ -80,9 +123,29 @@ export default function Analytics() {
         }).format(n);
   const pct = (n: number | null) => (n === null ? "—" : `${Math.round(n)}%`);
 
-  const maxWeek = data
-    ? Math.max(1, ...data.weekly.map((w) => w.hours))
-    : 1;
+  const compactMoney = (n: number) =>
+    new Intl.NumberFormat(undefined, {
+      style: "currency",
+      currency,
+      notation: "compact",
+      maximumFractionDigits: 1,
+    }).format(n);
+  const isHours = chart.metric === "hours";
+
+  const shown = data ? data.response.projects.filter((p) => !chart.excluded.has(p.contract_id)) : [];
+  const sum = (k: "hours" | "revenue" | "cost") => shown.reduce((acc, p) => acc + p[k], 0);
+  const totals = { hours: sum("hours"), revenue: sum("revenue"), cost: sum("cost") };
+  const totalMargin = totals.revenue - totals.cost;
+  const { periods, series } = data
+    ? buildSeries(data.response.entries, shown, {
+        granularity: chart.granularity,
+        groupBy: chart.groupBy,
+        metric: chart.metric,
+        from: data.from,
+        to: data.to,
+        colors,
+      })
+    : { periods: [], series: [] };
 
   return (
     <div className="page">
@@ -98,30 +161,14 @@ export default function Analytics() {
       <div className="card">
         <div className="card__pad">
           <div className="toolbar">
-            <div className="field">
-              <label className="field__label" htmlFor="an-from">
-                From
-              </label>
-              <input
-                id="an-from"
-                type="date"
-                className="input"
-                value={from}
-                onChange={(e) => setFrom(e.target.value)}
-              />
-            </div>
-            <div className="field">
-              <label className="field__label" htmlFor="an-to">
-                To
-              </label>
-              <input
-                id="an-to"
-                type="date"
-                className="input"
-                value={to}
-                onChange={(e) => setTo(e.target.value)}
-              />
-            </div>
+            <DateRangePicker
+              from={from}
+              to={to}
+              onChange={(start, end) => {
+                setFrom(start);
+                setTo(end);
+              }}
+            />
             <Button variant="primary" onClick={load} loading={loading} disabled={loading}>
               {!loading && <RefreshCw size={16} aria-hidden="true" />}
               Refresh
@@ -139,7 +186,7 @@ export default function Analytics() {
         </div>
       )}
 
-      {!loading && data && data.projects.length === 0 && (
+      {!loading && data && data.response.projects.length === 0 && (
         <div className="card">
           <div className="empty">
             <BarChart3 size={40} aria-hidden="true" />
@@ -148,8 +195,65 @@ export default function Analytics() {
         </div>
       )}
 
-      {!loading && data && data.projects.length > 0 && (
+      {!loading && data && data.response.projects.length > 0 && (
         <>
+          <section className="card" aria-label="Over time">
+            <div className="card__head chart-card__head">
+              <h3>Over time</h3>
+              <div className="chart-controls">
+                <Segmented
+                  label="Granularity"
+                  options={GRANULARITIES}
+                  value={chart.granularity}
+                  onChange={(granularity) => setChart({ ...chart, granularity })}
+                />
+                <Segmented
+                  label="Group by"
+                  options={GROUPS}
+                  value={chart.groupBy}
+                  onChange={(groupBy) => setChart({ ...chart, groupBy, hidden: new Set() })}
+                />
+                <Segmented
+                  label="Metric"
+                  options={METRICS}
+                  value={chart.metric}
+                  onChange={(metric) => setChart({ ...chart, metric })}
+                />
+              </div>
+              <div className="chart-chips" role="group" aria-label="Projects">
+                {data.response.projects.map((p) => (
+                  <button
+                    key={p.contract_id}
+                    type="button"
+                    className="chart-chip"
+                    aria-pressed={!chart.excluded.has(p.contract_id)}
+                    onClick={() =>
+                      setChart({ ...chart, excluded: toggled(chart.excluded, p.contract_id) })
+                    }
+                  >
+                    <span
+                      className="contract-swatch"
+                      style={{ background: colorForContract(p.contract_id, colors) }}
+                      aria-hidden="true"
+                    />
+                    {p.contract_name}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="card__pad">
+              <StackedColumnChart
+                periods={periods}
+                series={series}
+                hidden={chart.hidden}
+                onToggleSeries={(id) => setChart({ ...chart, hidden: toggled(chart.hidden, id) })}
+                formatValue={isHours ? (n) => `${n.toFixed(1)}h` : money}
+                formatTick={isHours ? (n) => `${n}h` : compactMoney}
+                ariaLabel={`${chart.metric} per ${chart.granularity}`}
+              />
+            </div>
+          </section>
+
           <section className="card" aria-label="Per-project analytics">
             <div className="card__head">
               <h3>By project</h3>
@@ -171,7 +275,7 @@ export default function Analytics() {
                   </tr>
                 </thead>
                 <tbody>
-                  {data.projects.map((p) => (
+                  {shown.map((p) => (
                     <tr key={p.contract_id}>
                       <td>
                         <span className="contract-cell">
@@ -184,7 +288,9 @@ export default function Analytics() {
                         </span>
                       </td>
                       <td className="num">{p.hours.toFixed(1)}h</td>
-                      <td className="num">{pct(p.allocation_pct)}</td>
+                      <td className="num">
+                        {pct(totals.hours ? (p.hours / totals.hours) * 100 : 0)}
+                      </td>
                       <td className="num">{rate(p.internal_rate)}</td>
                       <td className="num">{rate(p.external_rate)}</td>
                       <td className="num">{money(p.revenue)}</td>
@@ -197,47 +303,19 @@ export default function Analytics() {
                 <tfoot>
                   <tr>
                     <td>Total</td>
-                    <td className="num">{data.totals.hours.toFixed(1)}h</td>
+                    <td className="num">{totals.hours.toFixed(1)}h</td>
                     <td className="num">100%</td>
                     <td className="num" />
                     <td className="num" />
-                    <td className="num">{money(data.totals.revenue)}</td>
-                    <td className="num">{money(data.totals.cost)}</td>
-                    <td className="num">{money(data.totals.margin)}</td>
-                    <td className="num">{pct(data.totals.margin_pct)}</td>
+                    <td className="num">{money(totals.revenue)}</td>
+                    <td className="num">{money(totals.cost)}</td>
+                    <td className="num">{money(totalMargin)}</td>
+                    <td className="num">
+                      {pct(totals.revenue ? (totalMargin / totals.revenue) * 100 : null)}
+                    </td>
                   </tr>
                 </tfoot>
               </table>
-            </div>
-          </section>
-
-          <section className="card" aria-label="Weekly hours">
-            <div className="card__head">
-              <h3>Weekly hours</h3>
-              <span className="day-group__meta">{data.totals.hours.toFixed(1)}h total</span>
-            </div>
-            <div className="card__pad">
-              <div className="bars">
-                {data.weekly.map((w) => {
-                  const width = (w.hours / maxWeek) * 100;
-                  return (
-                    <div className="bar-row" key={w.week_start}>
-                      <span className="bar-row__label" title={w.week_start}>
-                        {fmtWeek(w.week_start)}
-                      </span>
-                      <span className="bar-row__track">
-                        <span className="bar-row__fill" style={{ width: `${width}%` }} />
-                        <span
-                          className="bar-row__value num"
-                          style={{ left: `calc(${width}% + ${width > 80 ? "-40px" : "8px"})` }}
-                        >
-                          {w.hours.toFixed(1)}h
-                        </span>
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
             </div>
           </section>
         </>

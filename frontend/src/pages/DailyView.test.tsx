@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ToastProvider } from "../components/Toast";
 import { LogHoursProvider } from "../state/LogHoursContext";
@@ -119,6 +119,10 @@ beforeEach(() => {
   });
 });
 
+afterEach(() => {
+  vi.useRealTimers();
+});
+
 describe("DailyView page", () => {
   it("renders the Log Hours heading", () => {
     renderDailyView();
@@ -135,10 +139,22 @@ describe("DailyView page", () => {
     });
   });
 
+  it("shows the Odoo sign-in modal when Odoo rejects the API key", async () => {
+    vi.mocked(api.contracts).mockRejectedValue(
+      new Error(
+        '401: {"detail":"Odoo rejected your API key — create a new one in Odoo and paste it into Settings → Odoo API key."}'
+      )
+    );
+    renderDailyView();
+    expect(
+      await screen.findByRole("heading", { name: "Odoo sign-in failed" })
+    ).toBeInTheDocument();
+  });
+
   it("shows the Refresh from calendar button", async () => {
     renderDailyView();
     expect(
-      screen.getByRole("button", { name: /Refresh from calendar/i })
+      screen.getByRole("button", { name: /^Refresh/i })
     ).toBeInTheDocument();
   });
 
@@ -146,7 +162,7 @@ describe("DailyView page", () => {
     renderDailyView();
 
     await userEvent.click(
-      screen.getByRole("button", { name: /Refresh from calendar/i })
+      screen.getByRole("button", { name: /^Refresh/i })
     );
 
     await waitFor(() => {
@@ -158,7 +174,7 @@ describe("DailyView page", () => {
   it("renders the Approve all imported checkbox after events load", async () => {
     renderDailyView();
     await userEvent.click(
-      screen.getByRole("button", { name: /Refresh from calendar/i })
+      screen.getByRole("button", { name: /^Refresh/i })
     );
     await waitFor(() => {
       expect(
@@ -170,7 +186,7 @@ describe("DailyView page", () => {
   it("renders Push approved to Odoo button after events load", async () => {
     renderDailyView();
     await userEvent.click(
-      screen.getByRole("button", { name: /Refresh from calendar/i })
+      screen.getByRole("button", { name: /^Refresh/i })
     );
     await waitFor(() => {
       expect(
@@ -182,7 +198,7 @@ describe("DailyView page", () => {
   it("calls api.push with the approved entries when Push is clicked", async () => {
     renderDailyView();
     await userEvent.click(
-      screen.getByRole("button", { name: /Refresh from calendar/i })
+      screen.getByRole("button", { name: /^Refresh/i })
     );
 
     // Wait for events and the push button to appear
@@ -213,6 +229,37 @@ describe("DailyView page", () => {
     });
   });
 
+  it("warns on a row whose contract ended before the event, without blocking push", async () => {
+    vi.mocked(api.contracts).mockResolvedValue([
+      { id: 10, name: "Acme Corp", start_date: "2025-06-01", end_date: "2026-05-31" },
+      { id: 20, name: "Beta Ltd", start_date: null, end_date: null },
+    ]);
+    renderDailyView();
+    await userEvent.click(
+      screen.getByRole("button", { name: /^Refresh/i }),
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("Contract ended May 31")).toBeInTheDocument();
+    });
+    expect(screen.getAllByText(/^Contract (ended|starts)/)).toHaveLength(1);
+    const select = screen.getByRole("combobox", { name: "Contract for Team Sync" });
+    expect(
+      within(select).getAllByRole("option").map((o) => o.textContent),
+    ).toEqual(["— Select contract —", "Acme Corp (ended May 31)", "Beta Ltd"]);
+
+    await userEvent.click(
+      screen.getByRole("button", { name: /Push approved to Odoo/i }),
+    );
+    await waitFor(() => {
+      expect(api.push).toHaveBeenCalledTimes(1);
+    });
+    expect(vi.mocked(api.push).mock.calls[0][0][0]).toMatchObject({
+      uid: "ev-1",
+      contract_id: 10,
+    });
+  });
+
   it("clears Overlap badges when the event linking two others is removed", async () => {
     // A 09:00–10:00 overlaps B; C 11:00–12:00 overlaps B; A and C do NOT
     // overlap each other. Removing B should leave neither A nor C overlapping.
@@ -223,7 +270,7 @@ describe("DailyView page", () => {
 
     renderDailyView();
     await userEvent.click(
-      screen.getByRole("button", { name: /Refresh from calendar/i }),
+      screen.getByRole("button", { name: /^Refresh/i }),
     );
 
     await waitFor(() => {
@@ -255,7 +302,7 @@ describe("DailyView page", () => {
 
     renderDailyView();
     await userEvent.click(
-      screen.getByRole("button", { name: /Refresh from calendar/i }),
+      screen.getByRole("button", { name: /^Refresh/i }),
     );
 
     await waitFor(() => {
@@ -282,7 +329,7 @@ describe("DailyView page", () => {
 
     renderDailyView();
     await userEvent.click(
-      screen.getByRole("button", { name: /Refresh from calendar/i }),
+      screen.getByRole("button", { name: /^Refresh/i }),
     );
 
     await waitFor(() => {
@@ -305,7 +352,7 @@ describe("DailyView page", () => {
   it("persists removal via api.excludeEntry with event metadata", async () => {
     renderDailyView();
     await userEvent.click(
-      screen.getByRole("button", { name: /Refresh from calendar/i }),
+      screen.getByRole("button", { name: /^Refresh/i }),
     );
     await userEvent.click(
       await screen.findByRole("button", { name: /Row actions for "Team Sync"/i }),
@@ -322,22 +369,21 @@ describe("DailyView page", () => {
     );
   });
 
-  it("calls api.events with the selected from/to dates on Refresh click", async () => {
+  it("calls api.events with the range picked in the date picker on Refresh click", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(2026, 9, 30, 12));
     renderDailyView();
+    await userEvent.click(screen.getByRole("button", { name: /From – To/ }));
+    await userEvent.click(screen.getByRole("button", { name: "Wednesday, October 28, 2026" }));
+    await userEvent.click(screen.getByRole("button", { name: "Monday, October 26, 2026" }));
+    expect(api.events).not.toHaveBeenCalled();
+
     await userEvent.click(
-      screen.getByRole("button", { name: /Refresh from calendar/i })
+      screen.getByRole("button", { name: /^Refresh/i })
     );
-
     await waitFor(() => {
-      expect(api.events).toHaveBeenCalled();
+      expect(api.events).toHaveBeenCalledWith("2026-10-26", "2026-10-28");
     });
-
-    const [start, end] = vi.mocked(api.events).mock.calls[0];
-    // Both default to today which is a non-empty string
-    expect(typeof start).toBe("string");
-    expect(start.length).toBeGreaterThan(0);
-    expect(typeof end).toBe("string");
-    expect(end.length).toBeGreaterThan(0);
   });
 });
 

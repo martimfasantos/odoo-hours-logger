@@ -41,6 +41,14 @@ export function formatDayHeading(iso: string): string {
   });
 }
 
+// Built once: toLocaleDateString with options builds a new formatter on every call.
+const MONTH_DAY = new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" });
+
+/** "Sep 18" style label from a YYYY-MM-DD string. */
+export function formatMonthDay(iso: string): string {
+  return MONTH_DAY.format(new Date(`${iso}T00:00:00`));
+}
+
 /** Format a number of hours compactly, e.g. 1.5 -> "1.5h", 2 -> "2h". */
 export function formatHours(h: number): string {
   return `${Number(h.toFixed(2))}h`;

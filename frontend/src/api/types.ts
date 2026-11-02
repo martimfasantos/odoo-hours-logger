@@ -1,4 +1,10 @@
-export interface OdooRef { id: number; name: string; }
+export interface OdooRef {
+  id: number;
+  name: string;
+  /** ISO YYYY-MM-DD, inclusive. */
+  start_date?: string | null;
+  end_date?: string | null;
+}
 
 export interface CalendarEvent {
   uid: string;
@@ -97,7 +103,6 @@ export interface AnalyticsProject {
   contract_id: number;
   contract_name: string;
   hours: number;
-  allocation_pct: number;
   internal_rate: number | null;
   external_rate: number | null;
   revenue: number;
@@ -106,23 +111,17 @@ export interface AnalyticsProject {
   margin_pct: number | null;
 }
 
-export interface AnalyticsWeek {
-  week_start: string;
-  hours: number;
-}
-
-export interface AnalyticsTotals {
+export interface AnalyticsEntry {
+  date: string; // local YYYY-MM-DD of the entry start
+  contract_id: number;
   hours: number;
   revenue: number;
   cost: number;
-  margin: number;
-  margin_pct: number | null;
 }
 
 export interface AnalyticsResponse {
   projects: AnalyticsProject[];
-  totals: AnalyticsTotals;
-  weekly: AnalyticsWeek[];
+  entries: AnalyticsEntry[];
   currency: string;
 }
 
@@ -130,9 +129,8 @@ export interface ConfigValues {
   GOOGLE_CALENDAR_URL: string;
   ODOO_URL: string;
   ODOO_DB: string;
-  ODOO_SESSION_ID: string;
-  ODOO_VISITOR_UUID: string;
-  ODOO_USER_ID: number | null;
+  ODOO_USERNAME: string;
+  ODOO_API_KEY: string;
   ODOO_NETWORK_MEMBER_ID: number | null;
   LOCAL_TZ: string;
   USER_EMAIL: string;

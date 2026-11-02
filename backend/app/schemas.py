@@ -60,6 +60,8 @@ class PushResult(BaseModel):
 class OdooRef(BaseModel):
     id: int
     name: str
+    start_date: Optional[Date] = None
+    end_date: Optional[Date] = None
 
     @field_validator("name", mode="before")
     @classmethod
@@ -110,7 +112,6 @@ class AnalyticsProject(BaseModel):
     contract_id: int
     contract_name: str
     hours: float
-    allocation_pct: float  # 0..100
     internal_rate: Optional[float] = None
     external_rate: Optional[float] = None
     revenue: float  # sum of external_cost
@@ -119,23 +120,17 @@ class AnalyticsProject(BaseModel):
     margin_pct: Optional[float] = None  # margin/revenue*100, None if revenue == 0
 
 
-class AnalyticsWeek(BaseModel):
-    week_start: Date  # Monday
-    hours: float
-
-
-class AnalyticsTotals(BaseModel):
-    hours: float
-    revenue: float
-    cost: float
-    margin: float
-    margin_pct: Optional[float] = None
+class AnalyticsEntry(BaseModel):
+    date: Date = Field(description="Local date the entry starts on.")
+    contract_id: int = Field(description="Odoo contract the entry is logged against.")
+    hours: float = Field(description="Logged duration in hours.")
+    revenue: float = Field(description="Entry's external cost (what the client is billed).")
+    cost: float = Field(description="Entry's internal cost.")
 
 
 class AnalyticsResponse(BaseModel):
     projects: list[AnalyticsProject]
-    totals: AnalyticsTotals
-    weekly: list[AnalyticsWeek]
+    entries: list[AnalyticsEntry]
     currency: str = "EUR"
 class ExcludedEntryRef(BaseModel):
     uid: str
@@ -157,9 +152,8 @@ class ConfigValues(BaseModel):
     GOOGLE_CALENDAR_URL: Optional[str] = None
     ODOO_URL: Optional[str] = None
     ODOO_DB: Optional[str] = None
-    ODOO_SESSION_ID: Optional[str] = None
-    ODOO_VISITOR_UUID: Optional[str] = None
-    ODOO_USER_ID: Optional[int] = None
+    ODOO_USERNAME: Optional[str] = None
+    ODOO_API_KEY: Optional[str] = None
     ODOO_NETWORK_MEMBER_ID: Optional[int] = None
     LOCAL_TZ: Optional[str] = None
     USER_EMAIL: Optional[str] = None
