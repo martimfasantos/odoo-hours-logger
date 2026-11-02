@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ToastProvider } from "../components/Toast";
 import MappingRules from "./MappingRules";
@@ -139,6 +139,81 @@ describe("MappingRules page", () => {
 
     await waitFor(() => {
       expect(api.setIgnoreKeywords).toHaveBeenCalledWith(["Lunch"]);
+    });
+  });
+
+  describe("contract status warnings", () => {
+    const CONTRACTS = [
+      { id: 10, name: "Acme Corp", start_date: "2020-01-01", end_date: "2999-12-31" },
+      { id: 20, name: "Beta Ltd", start_date: null, end_date: null },
+      { id: 30, name: "Old Greenvolt", start_date: "2019-02-01", end_date: "2020-01-31" },
+    ];
+    const rule = (id: number, name: string, contract_id: number) => ({
+      id,
+      name,
+      keywords: [name.toLowerCase()],
+      contract_id,
+      contract_name: `Contract ${contract_id}`,
+      active: true,
+    });
+    const STALE_RULES = [
+      rule(2, "DREM", 2056),
+      rule(3, "Greenvolt", 30),
+      rule(4, "Acme", 10),
+    ];
+
+    beforeEach(() => {
+      vi.mocked(api.contracts).mockResolvedValue(CONTRACTS);
+      vi.mocked(api.listRules).mockResolvedValue(STALE_RULES);
+    });
+
+    function fixSelect(ruleName: string) {
+      return screen.queryByRole("combobox", { name: `Fix contract for ${ruleName}` });
+    }
+
+    it("badges rules with unknown or ended contracts and offers only current ones", async () => {
+      renderMappingRules();
+
+      const drem = await screen.findByRole("row", { name: /DREM/ });
+      await waitFor(() => {
+        expect(within(drem).getByText("Not in your contracts")).toBeInTheDocument();
+      });
+      expect(
+        within(screen.getByRole("row", { name: /Greenvolt/ })).getByText("Ended Jan 31"),
+      ).toBeInTheDocument();
+      expect(fixSelect("Acme")).toBeNull();
+
+      expect(
+        within(fixSelect("DREM")!).getAllByRole("option").map((o) => o.textContent),
+      ).toEqual(["Reassign…", "Acme Corp", "Beta Ltd"]);
+    });
+
+    it("reassigns the rule through the fix-it select", async () => {
+      vi.mocked(api.listRules)
+        .mockResolvedValueOnce(STALE_RULES)
+        .mockResolvedValue([rule(2, "DREM", 20), ...STALE_RULES.slice(1)]);
+      vi.mocked(api.updateRule).mockResolvedValue(rule(2, "DREM", 20));
+      renderMappingRules();
+
+      await waitFor(() => expect(fixSelect("DREM")).not.toBeNull());
+      await userEvent.selectOptions(fixSelect("DREM")!, "20");
+
+      await waitFor(() => expect(fixSelect("DREM")).toBeNull());
+      expect(api.updateRule).toHaveBeenCalledWith(2, {
+        name: "DREM",
+        keywords: ["drem"],
+        contract_id: 20,
+        contract_name: "Beta Ltd",
+        active: true,
+      });
+    });
+
+    it("shows no warnings while contracts are unavailable", async () => {
+      vi.mocked(api.contracts).mockResolvedValue([]);
+      renderMappingRules();
+
+      await screen.findByRole("row", { name: /DREM/ });
+      expect(screen.queryByText("Not in your contracts")).toBeNull();
     });
   });
 
