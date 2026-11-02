@@ -21,9 +21,8 @@ const MASKED_STRING_FIELDS: (keyof ConfigValues)[] = [
   "GOOGLE_CALENDAR_URL",
   "ODOO_URL",
   "ODOO_DB",
-  "ODOO_SESSION_ID",
-  "ODOO_VISITOR_UUID",
-  "ODOO_USER_ID",
+  "ODOO_USERNAME",
+  "ODOO_API_KEY",
   "ODOO_NETWORK_MEMBER_ID",
   "LOCAL_TZ",
   "USER_EMAIL",
@@ -33,9 +32,8 @@ const FIELD_LABELS: Record<string, string> = {
   GOOGLE_CALENDAR_URL: "Google Calendar URL",
   ODOO_URL: "Odoo URL",
   ODOO_DB: "Odoo Database",
-  ODOO_SESSION_ID: "Odoo Session ID",
-  ODOO_VISITOR_UUID: "Odoo Visitor UUID",
-  ODOO_USER_ID: "Odoo User ID",
+  ODOO_USERNAME: "Odoo login (email)",
+  ODOO_API_KEY: "Odoo API key",
   ODOO_NETWORK_MEMBER_ID: "Odoo Network Member ID",
   LOCAL_TZ: "Local Timezone",
   USER_EMAIL: "User Email",
@@ -47,9 +45,8 @@ interface ConfigFormState {
   GOOGLE_CALENDAR_URL: string;
   ODOO_URL: string;
   ODOO_DB: string;
-  ODOO_SESSION_ID: string;
-  ODOO_VISITOR_UUID: string;
-  ODOO_USER_ID: string;
+  ODOO_USERNAME: string;
+  ODOO_API_KEY: string;
   ODOO_NETWORK_MEMBER_ID: string;
   LOCAL_TZ: string;
   USER_EMAIL: string;
@@ -60,9 +57,8 @@ const EMPTY_FORM: ConfigFormState = {
   GOOGLE_CALENDAR_URL: "",
   ODOO_URL: "",
   ODOO_DB: "",
-  ODOO_SESSION_ID: "",
-  ODOO_VISITOR_UUID: "",
-  ODOO_USER_ID: "",
+  ODOO_USERNAME: "",
+  ODOO_API_KEY: "",
   ODOO_NETWORK_MEMBER_ID: "",
   LOCAL_TZ: "",
   USER_EMAIL: "",
@@ -74,9 +70,8 @@ function configToForm(cfg: ConfigValues): ConfigFormState {
     GOOGLE_CALENDAR_URL: cfg.GOOGLE_CALENDAR_URL,
     ODOO_URL: cfg.ODOO_URL,
     ODOO_DB: cfg.ODOO_DB,
-    ODOO_SESSION_ID: cfg.ODOO_SESSION_ID,
-    ODOO_VISITOR_UUID: cfg.ODOO_VISITOR_UUID,
-    ODOO_USER_ID: cfg.ODOO_USER_ID !== null ? String(cfg.ODOO_USER_ID) : "",
+    ODOO_USERNAME: cfg.ODOO_USERNAME,
+    ODOO_API_KEY: cfg.ODOO_API_KEY,
     ODOO_NETWORK_MEMBER_ID:
       cfg.ODOO_NETWORK_MEMBER_ID !== null
         ? String(cfg.ODOO_NETWORK_MEMBER_ID)
@@ -92,10 +87,8 @@ function formToPayload(form: ConfigFormState): Partial<ConfigValues> {
     GOOGLE_CALENDAR_URL: form.GOOGLE_CALENDAR_URL,
     ODOO_URL: form.ODOO_URL,
     ODOO_DB: form.ODOO_DB,
-    ODOO_SESSION_ID: form.ODOO_SESSION_ID,
-    ODOO_VISITOR_UUID: form.ODOO_VISITOR_UUID,
-    ODOO_USER_ID:
-      form.ODOO_USER_ID.trim() !== "" ? Number(form.ODOO_USER_ID) : null,
+    ODOO_USERNAME: form.ODOO_USERNAME,
+    ODOO_API_KEY: form.ODOO_API_KEY,
     ODOO_NETWORK_MEMBER_ID:
       form.ODOO_NETWORK_MEMBER_ID.trim() !== ""
         ? Number(form.ODOO_NETWORK_MEMBER_ID)
@@ -115,6 +108,9 @@ export default function Settings() {
 
   // Config form state
   const [form, setForm] = useState<ConfigFormState>(EMPTY_FORM);
+  // Last loaded/saved key (null until loaded). The API key guide opens from
+  // this, not the form, so pasting a key does not collapse it.
+  const [savedApiKey, setSavedApiKey] = useState<string | null>(null);
   const [configLoading, setConfigLoading] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -164,7 +160,10 @@ export default function Settings() {
     setConfigLoading(true);
     api
       .getConfig()
-      .then((cfg) => setForm(configToForm(cfg)))
+      .then((cfg) => {
+        setForm(configToForm(cfg));
+        setSavedApiKey(cfg.ODOO_API_KEY);
+      })
       .catch((e) => toast.error(`Failed to load configuration: ${String(e)}`))
       .finally(() => setConfigLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -204,6 +203,7 @@ export default function Settings() {
     try {
       const updated = await api.saveConfig(formToPayload(form));
       setForm(configToForm(updated));
+      setSavedApiKey(updated.ODOO_API_KEY);
       toast.success("Settings saved.");
     } catch (e) {
       toast.error(`Failed to save settings: ${String(e)}`);
@@ -218,6 +218,9 @@ export default function Settings() {
   function toggleReveal(field: keyof ConfigValues) {
     setRevealed((prev) => ({ ...prev, [field]: !prev[field] }));
   }
+
+  const odooUrl = form.ODOO_URL.trim().replace(/\/+$/, "");
+  const debugUrl = odooUrl ? `${odooUrl}/web?debug=1` : "";
 
   return (
     <div className="page">
@@ -310,25 +313,39 @@ export default function Settings() {
         <div className="card__pad">
           <p className="field-reveal__note">
             Changes are saved to <code>backend/.env</code> and applied
-            immediately. Update <code>ODOO_SESSION_ID</code> here when your
-            session expires.
+            immediately. The app signs in to Odoo with your login and API key.
           </p>
-          <details className="field-reveal__note">
+          <details className="field-reveal__note" open={savedApiKey === ""}>
             <summary style={{ cursor: "pointer", fontWeight: 600 }}>
-              How to get a fresh session ID
+              How to get an Odoo API key
             </summary>
             <ol style={{ margin: "8px 0 0", paddingLeft: "20px", lineHeight: 1.6 }}>
-              <li>Open Odoo in your browser and log in (VPN on).</li>
               <li>
-                Open DevTools (<kbd>⌥⌘I</kbd>) → <b>Application</b> →{" "}
-                <b>Cookies</b> → your Odoo domain.
+                {debugUrl ? (
+                  <a href={debugUrl} target="_blank" rel="noreferrer">
+                    Open Odoo in developer mode
+                  </a>
+                ) : (
+                  "Open Odoo in developer mode"
+                )}{" "}
+                (your Odoo URL + <code>/web?debug=1</code>).
               </li>
               <li>
-                Copy the value of the <code>session_id</code> cookie.
+                Click your avatar (top right) → <b>My Profile</b>.
               </li>
               <li>
-                Paste it into the <b>Odoo Session ID</b> field below, then{" "}
-                <b>Save settings</b>.
+                Open the <b>Account Security</b> tab → <b>Developer API Keys</b> →{" "}
+                <b>New API Key</b>.
+              </li>
+              <li>Confirm your Odoo password when asked.</li>
+              <li>
+                Name it (e.g. "Hours Logger") and generate it. Copy the key now;
+                Odoo shows it only once.
+              </li>
+              <li>
+                Paste it into <b>Odoo API key</b> below, check{" "}
+                <b>Odoo login (email)</b> is your Odoo email, <b>Save settings</b>,
+                then <b>Test connection</b>.
               </li>
             </ol>
           </details>

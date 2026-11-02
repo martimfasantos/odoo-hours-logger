@@ -13,10 +13,10 @@ import Button from "../components/Button";
 import Badge from "../components/Badge";
 import Spinner from "../components/Spinner";
 import VpnModal from "../components/VpnModal";
-import SessionExpiredModal from "../components/SessionExpiredModal";
+import OdooAuthModal from "../components/OdooAuthModal";
 import DailyCalendar from "./DailyCalendar";
 import { colorForContract, UNASSIGNED_COLOR } from "../lib/colors";
-import { isUnreachableError, isSessionExpiredError } from "../lib/errors";
+import { isUnreachableError, isOdooAuthError } from "../lib/errors";
 import { useLogHours, type RowState } from "../state/LogHoursContext";
 import {
   startOfWeek,
@@ -153,7 +153,7 @@ export default function DailyView() {
     null,
   );
   const [vpnOpen, setVpnOpen] = useState(false);
-  const [sessionExpiredOpen, setSessionExpiredOpen] = useState(false);
+  const [authFailedOpen, setAuthFailedOpen] = useState(false);
 
   // Which row's action menu is currently open (only one at a time).
   const [openMenuKey, setOpenMenuKey] = useState<string | null>(null);
@@ -193,7 +193,7 @@ export default function DailyView() {
       .then(setContracts)
       .catch((e) => {
         if (isUnreachableError(e)) setVpnOpen(true);
-        else if (isSessionExpiredError(e)) setSessionExpiredOpen(true);
+        else if (isOdooAuthError(e)) setAuthFailedOpen(true);
         toast.error(`Failed to load contracts: ${String(e)}`);
       });
   }
@@ -389,8 +389,8 @@ export default function DailyView() {
         else failed += 1;
       }
       setResults(map);
-      if (resp.results.some((r) => !r.success && isSessionExpiredError(r.error))) {
-        setSessionExpiredOpen(true);
+      if (resp.results.some((r) => !r.success && isOdooAuthError(r.error))) {
+        setAuthFailedOpen(true);
       }
       if (failed === 0) {
         toast.success(`${ok} logged to Odoo`);
@@ -1104,9 +1104,9 @@ export default function DailyView() {
         onClose={() => setVpnOpen(false)}
       />
 
-      <SessionExpiredModal
-        open={sessionExpiredOpen}
-        onClose={() => setSessionExpiredOpen(false)}
+      <OdooAuthModal
+        open={authFailedOpen}
+        onClose={() => setAuthFailedOpen(false)}
       />
     </div>
   );

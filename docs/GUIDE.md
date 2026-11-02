@@ -7,7 +7,7 @@ It runs locally: a Python **FastAPI** backend (port **8010**) and a **React/Vite
 matching is plain keyword substring matching.
 
 ```
-Google Calendar ──(secret iCal URL)──▶  FastAPI backend  ◀──(session cookie, XML/JSON-RPC)──▶  Odoo
+Google Calendar ──(secret iCal URL)──▶  FastAPI backend  ◀──(API key, JSON-RPC)──▶  Odoo
                                               │
                                               ▼  REST/JSON
                                          React frontend (you)
@@ -21,8 +21,8 @@ All configuration lives in **`backend/.env`**. You can edit it two ways:
 
 - **Settings tab in the UI** (recommended) — every value is editable there, shown masked
   (password-style) with an eye toggle to reveal/edit. **Save** writes `backend/.env` and applies
-  the change immediately (no restart). This is the easiest place to **re-paste an expired
-  `ODOO_SESSION_ID`**.
+  the change immediately (no restart). This is the easiest place to **paste your Odoo API key**
+  (it has a step-by-step guide).
 - **Editing `backend/.env` directly** — copy `backend/.env.example` to `backend/.env` and fill it
   in. (If the backend is already running, the Settings-tab save path applies changes live; a
   manual file edit is picked up on the next backend start.)
@@ -32,12 +32,11 @@ All configuration lives in **`backend/.env`**. You can edit it two ways:
 | `GOOGLE_CALENDAR_URL` | **Yes** | Google Calendar → Settings → your calendar → *Integrate calendar* → **"Secret address in iCal format"**. (The "public" address only works if the calendar is truly world-public with *full event details*; the secret address always works.) |
 | `ODOO_URL` | **Yes** | `https://erp.daredata.engineering` |
 | `ODOO_DB` | **Yes** | `odoo` |
-| `ODOO_SESSION_ID` | **Yes** | Your live Odoo session cookie. In a logged-in Odoo browser tab: DevTools → Application → Cookies → copy `session_id`. **It expires** (logout / server restart / re-login) — re-paste a fresh one in the Settings tab when the connection test fails. |
-| `ODOO_VISITOR_UUID` | No | The `visitor_uuid` cookie (optional; leave blank if absent). |
-| `ODOO_USER_ID` | No | Auto-discovered from the session. Set only to override. |
-| `ODOO_NETWORK_MEMBER_ID` | No | Auto-discovered from the session. Set only to override. |
+| `ODOO_USERNAME` | **Yes** | Your Odoo login email. |
+| `ODOO_API_KEY` | **Yes** | An Odoo API key; it does not expire. Odoo only shows the API-key section in developer mode: open `<ODOO_URL>/web?debug=1` → avatar → **My Profile** → **Account Security** → **Developer API Keys** → **New API Key** (confirm your password; copy the key, it is shown once). |
+| `ODOO_NETWORK_MEMBER_ID` | No | Auto-discovered from your Odoo user. Set only to override. |
 | `LOCAL_TZ` | No | Your timezone (default `Europe/Lisbon`). |
-| `USER_EMAIL` | No | Auto-derived from the Odoo session (used to skip *declined* calendar events). Set only to override (e.g. if your calendar address differs from your Odoo login). |
+| `USER_EMAIL` | No | Defaults to `ODOO_USERNAME` (used to skip *declined* calendar events). Set only to override (e.g. if your calendar address differs from your Odoo login). |
 | `DEMO_MODE` | No | `true` runs the whole UI on sample data with a simulated push and **no** real Odoo/Calendar calls. `false` (default) = live. |
 | `DATA_DIR` | No | Where the JSON state files live (default `data`, i.e. `backend/data/`). |
 
@@ -49,21 +48,21 @@ All configuration lives in **`backend/.env`**. You can edit it two ways:
 
 ## 2. How it connects to Odoo (technical)
 
-This Odoo instance has **no API keys**, so the app authenticates **the same way your browser does** —
-with your session cookie:
+The app signs in with your Odoo login and an API key, over Odoo's external JSON-RPC API:
 
-- Every request sends the `session_id` **cookie** plus an `X-Openerp-Session-Id` header and a
-  `Referer: <ODOO_URL>/web` header, to Odoo's **web JSON-RPC** routes:
-  - `POST /web/session/get_session_info` → returns your `uid` and `username` (your email).
-  - `POST /web/dataset/call_kw/<model>/<method>` with `{"jsonrpc":"2.0","method":"call","params":{model,method,args,kwargs}}`.
-- **Identity is auto-discovered** from the session (you don't hard-code it):
-  - `uid` comes from `get_session_info`.
-  - your **`network_member`** id is found via `search_read` on the `network_member` model where its
-    `user` field equals your `uid`.
-  - Both can be overridden with `ODOO_USER_ID` / `ODOO_NETWORK_MEMBER_ID` if needed.
-- **Failure modes are distinguished:** an HTML/login response or `uid: null` → *session expired*
-  (re-paste `ODOO_SESSION_ID`); a connection error (httpx `RequestError`, ~6s connect timeout) →
-  *unreachable* → the VPN popup.
+- `POST /jsonrpc` `{"service":"common","method":"authenticate","args":[db, login, api_key, {}]}` →
+  your `uid` (or `false` for a bad key). The `uid` is cached for the backend's lifetime.
+- Every model call is `POST /jsonrpc`
+  `{"service":"object","method":"execute_kw","args":[db, uid, api_key, model, method, args, kwargs]}`.
+- Your **`network_member`** id is found via `search_read` on the `network_member` model where its
+  `user` field equals your `uid`. Override it with `ODOO_NETWORK_MEMBER_ID` if needed.
+- **Failure modes are distinguished** (sign-in failures return HTTP 401 from the backend and open
+  the *"Odoo sign-in failed"* popup):
+  - an empty `ODOO_USERNAME` or `ODOO_API_KEY` → *"Add your Odoo login and API key in Settings."*,
+    with no call to Odoo;
+  - a rejected key (`authenticate` returns `false`, or `Access Denied`) → *"Odoo rejected your API
+    key"*. The key does not expire on its own;
+  - a connection error (httpx `RequestError`, ~6s connect timeout) → *unreachable* → the VPN popup.
 
 Timesheets are written to Daredata's **custom `timesheet_entry` model** (not the standard
 `account.analytic.line`).
@@ -182,7 +181,8 @@ the app with no VPN/credentials. Set it back to `false` for live use.
 | Symptom | Cause / fix |
 |---|---|
 | "Can't reach Odoo" popup / Odoo "Down" | VPN is off → connect to the VPN and retry. |
-| Odoo connection test fails with a session message | `ODOO_SESSION_ID` expired → copy a fresh `session_id` from a logged-in Odoo tab into the Settings tab. |
+| Odoo connection test says to add your login and API key | `ODOO_USERNAME` or `ODOO_API_KEY` is empty → create a key (Settings → *How to get an Odoo API key*) and save both. |
+| Odoo connection test says it rejected your API key | The key was deleted or mistyped, or `ODOO_USERNAME` is not your Odoo login → create a new key (Settings → *How to get an Odoo API key*) and check the login. |
 | No events appear after Refresh | Check the date range; check `GOOGLE_CALENDAR_URL` (use the *secret* iCal address with full event details). |
 | An event you didn't want got imported | Add a **filter word** that matches its title. |
 | Events show "Unassigned" | No rule matched the title — add a mapping rule (keyword → contract) or pick a contract manually. |
