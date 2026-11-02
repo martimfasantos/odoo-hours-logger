@@ -31,7 +31,15 @@ class Settings(BaseSettings):
         return v
 
     def data_path(self, filename: str) -> Path:
-        return Path(self.DATA_DIR) / filename
+        # A relative DATA_DIR (e.g. the historical "data") is anchored to
+        # app_data_dir() so it resolves to the same place regardless of the
+        # process CWD. This is what makes the packaged app — launched from "/"
+        # — read and write its data under ~/Library/Application Support/…
+        # instead of a throwaway /data. Absolute DATA_DIR values are used as-is.
+        base = Path(self.DATA_DIR)
+        if not base.is_absolute():
+            base = app_data_dir() / base
+        return base / filename
 
 
 def get_settings() -> Settings:
